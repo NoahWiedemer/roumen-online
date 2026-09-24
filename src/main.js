@@ -1,0 +1,393 @@
+// Roumen Online — bootstrap, input handling and main loop
+import * as THREE from 'three';
+import { Engine } from './core/engine.js';
+import { Input } from './core/input.js';
+import { FollowCamera } from './core/camera.js';
+import { Audio } from './core/audio.js';
+import { G } from './game/game.js';
+import { Terrain } from './world/terrain.js';
+import { Sky } from './world/sky.js';
+import { createSea } from './world/sea.js';
+import { createPortal } from './world/portal.js';
+import { PORTALS } from './world/layout.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as MonsterModels from './entities/monsterModels.js';
+import { createWorldContext } from './world/worldctx.js';
+import { buildVegetation } from './world/vegetation.js';
+import { NavGrid } from './world/colliders.js';
+import { Effects } from './entities/effects.js';
+import { Player } from './entities/player.js';
+import { MonsterManager } from './entities/monsters.js';
+import { NpcManager } from './entities/npcs.js';
+import { LootManager } from './entities/loot.js';
+import { createMiniHouse } from './entities/minihouse.js';
+import { QuestLog } from './game/quests.js';
+import { HUD, SLOT_CODES } from './ui/hud.js';
+
+const loadFill = document.getElementById('loadFill');
+const loadText = document.getElementById('loadText');
+let _stepT = performance.now(), _stepName = 'start';
+const timings = [];
+const step = async (pct, text) => {
+  const now = performance.now();
+  timings.push(`${_stepName}: ${Math.round(now - _stepT)}ms`);
+  _stepT = now; _stepName = text;
+  window.__loadTimings = timings;
+  loadFill.style.width = pct + '%';
+  loadText.textContent = text;
+  // yield so the loading bar can paint (setTimeout fallback keeps loading going in hidden tabs)
+  await new Promise((r) => { let done = false; const fin = () => { if (!done) { done = true; r(); } }; requestAnimationFrame(() => setTimeout(fin, 0)); setTimeout(fin, 60); });
+};
+
+// ------------------------------------------------------------------ options
+const OPT_KEY = 'roumen-online-options-v1';
+G.options = { shadows: true, bloom: true, pixelRatio: Math.min(window.devicePixelRatio, 2) > 1.4 ? 1.5 : 1, sfx: 0.5, music: 0.22 };
+try { Object.assign(G.options, JSON.parse(localStorage.getItem(OPT_KEY) || '{}')); } catch { /* ignore */ }
+G.saveOptions = () => { try { localStorage.setItem(OPT_KEY, JSON.stringify(G.options)); } catch { /* ignore */ } };
+G.applyOptions = () => {
+  const o = G.options, e = G.engine;
+  e.renderer.setPixelRatio(o.pixelRatio);
+  e.resize();
+  e.useBloom = o.bloom;
+  if (e.renderer.shadowMap.enabled !== o.shadows) {
+    e.renderer.shadowMap.enabled = o.shadows;
+    e.sun.castShadow = o.shadows;
+    G.scene.traverse((m) => { if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => { x.needsUpdate = true; }); });
+  }
+  G.saveOptions();
+};
+G.resetSave = () => { Player.clearSave(); location.reload(); };
+
+async function init() {
+  await step(4, 'Preparing renderer…');
+  const canvas = document.getElementById('game');
+  const engine = new Engine(canvas, { bloom: G.options.bloom });
+  G.engine = engine; G.scene = engine.scene; G.camera = engine.camera;
+  engine.renderer.setPixelRatio(G.options.pixelRatio);
+  engine.resize();
+  G.audio = new Audio();
+  G.audio.sfxVol = G.options.sfx; G.audio.musicVol = G.options.music;
+
+  await step(7, 'Loading models…');
+  const assets = {};
+  try { assets.house = (await new GLTFLoader().loadAsync('/models/house.glb')).scene; } catch (e) { console.warn('house model', e); }
+  if (MonsterModels.preloadMonsterAssets) { try { await MonsterModels.preloadMonsterAssets(); } catch (e) { console.warn('monster assets', e); } }
+
+  await step(12, 'Shaping the land…');
+  const terrain = new Terrain();
+  G.terrain = terrain;
+  engine.scene.add(terrain.mesh);
+  const sky = new Sky(engine.scene, engine.sunDir);
+  const sea = createSea(terrain, engine.sunDir);
+  engine.scene.add(sea.mesh);
+
+  await step(28, 'Building Roumen…');
+  const ctx = createWorldContext(engine.scene, terrain);
+  ctx.assets = assets;
+  G.colliders = ctx.colliders;
+  let town;
+  try { const { buildTown } = await import('./world/town.js'); town = buildTown(ctx); }
+  catch (e) { console.error('town build failed', e); town = { update() {}, npcSpots: {} }; }
+  // portals (sealed for now)
+  G.portals = PORTALS.map((p) => {
+    const portal = createPortal({ ...p, y: terrain.groundAt(p.x, p.z) });
+    engine.scene.add(portal.group);
+    const c = Math.cos(p.rotY), s = Math.sin(p.rotY);
+    for (const sx of [-1, 1]) ctx.colliders.addCircle(p.x + c * sx * 2.35, p.z - s * sx * 2.35, 0.6);
+    ctx.addNoScatter(p.x, p.z, 4);
+    ctx.minimap.addCircle(p.x, p.z, 2.2, '#4dff9a');
+    return portal;
+  });
+
+  await step(48, 'Growing trees and flowers…');
+  buildVegetation(ctx);
+
+  await step(60, 'Merging geometry…');
+  ctx.batcher.build(engine.scene);
+
+  await step(68, 'Mapping paths…');
+  G.nav = new NavGrid(terrain, ctx.colliders, 1);
+
+  await step(78, 'Waking up the townsfolk…');
+  G.fx = new Effects(engine.scene);
+  G.loot = new LootManager();
+  G.quests = new QuestLog();
+  const player = new Player();
+  const loaded = player.load();
+  G.player = player;
+  player.attach(engine.scene);
+  if (!G.nav.isWalkable(player.pos.x, player.pos.z)) { const w = G.nav.nearestWalkable(player.pos.x, player.pos.z, 20); if (w) player.pos.set(w[0], 0, w[1]); }
+  player.pos.y = terrain.groundAt(player.pos.x, player.pos.z);
+  G.npcs = new NpcManager();
+  if (player._savedQuests) G.quests.load(player._savedQuests);
+
+  await step(88, 'Spawning monsters…');
+  G.monsters = new MonsterManager();
+  G.monsters.spawnAll();
+  try { MonsterModels.warmupMonsters && MonsterModels.warmupMonsters(engine.renderer, engine.camera, engine.scene); } catch (e) { console.warn(e); }
+
+  await step(94, 'Drawing the map…');
+  G.input = new Input(canvas);
+  G.cam = new FollowCamera(engine.camera, terrain);
+  G.cam.setBlockers(ctx.colliders, terrain);
+  G.cam.yaw = player.rotY + Math.PI;
+  G.cam.snap(player.pos);
+  const hud = new HUD();
+  G.ui = hud;
+  hud.buildMinimapBase(ctx.minimap);
+  hud.renderSkillbars();
+  hud.renderBuffs();
+  G.quests.refresh();
+  player.recalc();
+
+  // warm up: compile shaders by rendering once
+  engine.setShadowFocus(player.pos);
+  engine.render();
+  hud.refreshPortrait();
+
+  await step(100, loaded ? `Welcome back, ${player.name}!` : 'Ready!');
+  showStart(loaded, () => {
+    G.audio.unlock();
+    document.getElementById('loading').classList.add('done');
+    if (!loaded) {
+      G.msg('Welcome to Roumen! Talk to Town Chief Oswin on the plaza (look for the ! marker).', 'quest');
+      G.msg('Left-click to move · double-click monsters to attack · right-drag to rotate the camera.', 'sys');
+    }
+    hud.centerMsg('Roumen', 3);
+  });
+
+  // ------------------------------------------------------------------ main loop
+  const clock = new THREE.Clock();
+  let saveT = 0;
+  const loop = () => {
+    requestAnimationFrame(loop);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    G.time += dt;
+    handleInput(dt);
+    player.update(dt);
+    updateHouse(dt);
+    G.monsters.update(dt);
+    G.npcs.update(dt);
+    G.loot.update(dt);
+    for (const f of ctx.updaters) f(dt, G.time);
+    sea.update(G.time);
+    for (const p of G.portals) p.update(dt, G.time, G.fx);
+    if (town.update) town.update(dt, G.time);
+    G.cam.update(dt, player.pos, G.input);
+    engine.setShadowFocus(player.pos);
+    sky.update(dt, engine.camera.position);
+    G.fx.update(dt, engine.camera);
+    hud.update(dt);
+    engine.render();
+    G.input.endFrame();
+    saveT += dt;
+    if (saveT > 30) { saveT = 0; player.save(); }
+  };
+  loop();
+  window.addEventListener('beforeunload', () => player.save());
+  const fitHud = () => {
+    const k = Math.min(window.innerWidth / 1360, window.innerHeight / 780);
+    G.uiScale = k < 1 ? Math.max(0.4, k) : 1;
+    document.getElementById('hud').style.zoom = k < 1 ? G.uiScale.toFixed(3) : '';
+  };
+  window.addEventListener('resize', fitHud);
+  fitHud();
+  window.G = G; // debug handle
+}
+
+function showStart(loaded, onStart) {
+  const inner = document.querySelector('.load-inner');
+  const box = document.createElement('div');
+  box.innerHTML = `${loaded ? '' : '<input class="name-input" maxlength="14" placeholder="Character name" value="Ryou">'}
+    <div><button class="start-btn">${loaded ? 'Continue' : 'Start Adventure'}</button></div>
+    <div class="start-sub">Fighter · Roumen<br>Click to move · Double-click to attack · 1–0 skills · Q/E stones · I/C/K/L/M windows</div>`;
+  inner.appendChild(box);
+  const btn = box.querySelector('.start-btn');
+  const input = box.querySelector('.name-input');
+  const go = () => {
+    if (input && input.value.trim()) G.player.name = input.value.trim().slice(0, 14);
+    G.player.save();
+    onStart();
+  };
+  btn.onclick = go;
+  const q = new URLSearchParams(location.search);
+  if (q.has('autostart')) {
+    document.getElementById('loading').style.transition = 'none';
+    setTimeout(() => {
+      go();
+      // debug camera / position params
+      if (q.get('pos')) { const [x, z] = q.get('pos').split(',').map(Number); G.player.teleport(x, z); }
+      if (q.get('rot')) G.player.rotY = Number(q.get('rot'));
+      if (q.get('yaw')) G.cam.yaw = Number(q.get('yaw'));
+      if (q.get('pitch')) G.cam.pitch = Number(q.get('pitch'));
+      if (q.get('dist')) { G.cam.targetDist = G.cam.dist = Number(q.get('dist')); G.cam.maxDist = Math.max(G.cam.maxDist, G.cam.dist); }
+      if (q.has('hideui')) document.getElementById('hud').style.display = 'none';
+      if (q.get('win')) q.get('win').split(',').forEach((w) => G.ui.win.open(w));
+      if (q.get('target')) { const t = G.monsters.nearestTarget(G.player.pos, 60); if (t) G.player.setTarget(t); }
+      G.cam.snap(G.player.pos);
+    }, 10);
+  }
+  if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); e.stopPropagation(); });
+}
+
+// ------------------------------------------------------------------ picking
+const ray = new THREE.Raycaster();
+const tmpSphere = new THREE.Sphere();
+function pickEntity(mx, my) {
+  ray.setFromCamera(new THREE.Vector2(mx, my), G.camera);
+  let best = null, bd = Infinity;
+  const hit = new THREE.Vector3();
+  const test = (ent, cx, cy, cz, r) => {
+    tmpSphere.center.set(cx, cy, cz); tmpSphere.radius = r;
+    if (ray.ray.intersectSphere(tmpSphere, hit)) {
+      const d = hit.distanceTo(ray.ray.origin);
+      if (d < bd) { bd = d; best = ent; }
+    }
+  };
+  for (const m of G.monsters.list) if (!m.dead) test(m, m.pos.x, m.groundY + m.height * 0.5, m.pos.z, Math.max(m.radius * 1.1, m.height * 0.55));
+  for (const n of G.npcs.list) test(n, n.pos.x, n.pos.y + n.height * 0.5, n.pos.z, 0.75);
+  for (const l of G.loot.list) test(l, l.pos.x, l.pos.y + 0.25, l.pos.z, 0.55);
+  for (const p of G.portals) test(p, p.pos.x, p.pos.y + 2.6, p.pos.z, 1.9);
+  return best;
+}
+function pickGround(mx, my) {
+  ray.setFromCamera(new THREE.Vector2(mx, my), G.camera);
+  const o = ray.ray.origin, d = ray.ray.direction;
+  let prev = 0;
+  for (let t = 0.5; t < 320; t += 0.6) {
+    const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+    if (y < Math.max(G.terrain.heightAt(x, z), 0)) {
+      let a = prev, b = t;
+      for (let i = 0; i < 12; i++) {
+        const m = (a + b) / 2;
+        const yy = o.y + d.y * m;
+        if (yy < Math.max(G.terrain.heightAt(o.x + d.x * m, o.z + d.z * m), 0)) b = m; else a = m;
+      }
+      return new THREE.Vector3(o.x + d.x * b, o.y + d.y * b, o.z + d.z * b);
+    }
+    prev = t;
+  }
+  return null;
+}
+
+// ------------------------------------------------------------------ input handling
+function handleInput(dt) {
+  const inp = G.input, p = G.player, ui = G.ui;
+  // hover
+  if (inp.mouse.overCanvas) {
+    const h = pickEntity(inp.mouse.nx, inp.mouse.ny);
+    G.hovered = h;
+    if (h && h.setHighlight === undefined && h.model) h.model.setHighlight && h.model.setHighlight(true);
+    if (G._lastHover && G._lastHover !== h && G._lastHover.model) G._lastHover.model.setHighlight && G._lastHover.model.setHighlight(false);
+    if (h && h.model) h.model.setHighlight && h.model.setHighlight(true);
+    G._lastHover = h;
+    G.engine.canvas.style.cursor = h ? (h.isNpc || h.isPortal ? 'help' : h.isLoot ? 'grab' : 'crosshair') : 'default';
+  } else G.hovered = null;
+
+  for (const c of inp.consumeClicks()) {
+    G.audio.unlock();
+    const nx = (c.x / window.innerWidth) * 2 - 1, ny = -(c.y / window.innerHeight) * 2 + 1;
+    const ent = pickEntity(nx, ny);
+    if (p.dead) continue;
+    if (ent && ent.isNpc) {
+      p.setTarget(ent);
+      p.autoAttack = false;
+      p.pending = { kind: 'npc', npc: ent };
+      p.pathTimer = 0;
+      p.exitHouse && p.exitHouse();
+      continue;
+    }
+    if (ent && ent.isLoot) { p.pending = { kind: 'loot', loot: ent }; p.moveTo(ent.pos.x, ent.pos.z); continue; }
+    if (ent && ent.isPortal) {
+      const d = Math.hypot(ent.pos.x - p.pos.x, ent.pos.z - p.pos.z);
+      if (d > 6) { p.moveTo(ent.pos.x + Math.sin(ent.group.rotation.y) * 3.5, ent.pos.z + Math.cos(ent.group.rotation.y) * 3.5); }
+      else { G.msg(`The way to ${ent.name} is sealed for now. (Coming soon)`, 'warn'); G.audio.play('teleport'); }
+      continue;
+    }
+    if (ent && !ent.isNpc) {
+      if (c.button === 2 || c.double || p.target === ent) p.attackTarget(ent);
+      else p.setTarget(ent);
+      continue;
+    }
+    if (c.button !== 0) continue;
+    const g = pickGround(nx, ny);
+    if (g) {
+      p.autoAttack = false;
+      p.pending = null;
+      p.exitHouse && p.exitHouse();
+      if (p.moveTo(g.x, g.z)) G.fx.showClick(g);
+    }
+  }
+
+  // hotkeys
+  const shift = inp.down('ShiftLeft') || inp.down('ShiftRight');
+  SLOT_CODES.forEach((code, i) => { if (inp.wasPressed(code)) ui.activateSlot(shift ? 1 : 0, i); });
+  if (inp.wasPressed('Tab')) { const t = G.monsters.cycleTarget(p.pos, p.target); if (t) p.setTarget(t); }
+  if (inp.wasPressed('KeyQ')) p.useStone('hp');
+  if (inp.wasPressed('KeyE')) p.useStone('sp');
+  if (inp.wasPressed('Home')) p.toggleSit();
+  if (inp.wasPressed('KeyH')) p.toggleHouse();
+  const winKeys = { KeyC: 'character', KeyI: 'inventory', KeyK: 'skills', KeyL: 'quests', KeyM: 'map', KeyV: 'actions', KeyF: 'community', KeyX: 'store', F10: 'help' };
+  for (const [k, w] of Object.entries(winKeys)) if (inp.wasPressed(k)) ui.win.toggle(w);
+  if (inp.wasPressed('Escape')) {
+    if (!ui.win.closeTop()) {
+      if (p.target) p.setTarget(null);
+      else ui.win.toggle('options');
+    }
+  }
+  if (p.inHouse && (inp.down('KeyW') || inp.down('KeyA') || inp.down('KeyS') || inp.down('KeyD'))) p.exitHouse();
+}
+
+// ------------------------------------------------------------------ mini house resting
+let house = null, smokeT = 0;
+Player.prototype.toggleHouse = function () {
+  if (this.inHouse) { this.exitHouse(); return; }
+  if (this.dead || this.anim.busy || this.inCombatT > 0) { G.msg('You cannot rest while in combat.', 'warn'); return; }
+  if (G.npcs.list.some((n) => Math.hypot(n.pos.x - this.pos.x, n.pos.z - this.pos.z) < 4)) { G.msg('Too close to someone to set up your mini house.', 'warn'); return; }
+  this.stopActions();
+  this.standUp();
+  this.inHouse = true;
+  this.sitting = true;
+  if (!house) house = createMiniHouse();
+  house.position.copy(this.pos);
+  house.rotation.y = this.rotY;
+  house.scale.setScalar(0.01);
+  G.scene.add(house);
+  this.root.visible = false;
+  G.fx.poof(this.pos, '#ffffff', 22);
+  G.audio.play('pickup');
+  G.emit('buffs');
+};
+Player.prototype.exitHouse = function () {
+  if (!this.inHouse) return;
+  this.inHouse = false;
+  this.sitting = false;
+  this.anim.sitTarget = 0; this.anim.sit = 0;
+  this.root.visible = true;
+  if (house) G.scene.remove(house);
+  G.fx.poof(this.pos, '#ffffff', 22);
+  G.emit('buffs');
+};
+function updateHouse(dt) {
+  const p = G.player;
+  if (!p.inHouse || !house) return;
+  const s = house.scale.x;
+  if (s < 1) house.scale.setScalar(Math.min(1, s + dt * 4 * (1.2 - s) + 0.01));
+  house.rotation.y = p.rotY;
+  // extra regen while resting in the house
+  p.hp = Math.min(p.stats.maxHp, p.hp + p.stats.maxHp * 0.05 * dt);
+  p.sp = Math.min(p.stats.maxSp, p.sp + p.stats.maxSp * 0.06 * dt);
+  smokeT += dt;
+  if (smokeT > 0.35) {
+    smokeT = 0;
+    const c = house.userData.chimney.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), house.rotation.y).add(house.position);
+    G.fx.particles.emit({ x: c.x, y: c.y, z: c.z, vx: 0.2, vy: 0.8, life: 2.2, size: 0.35, endSize: 0.9, color: new THREE.Color('#d8d8d8'), drag: 0.5, grav: 0, alpha: 0.35 });
+  }
+}
+
+window.addEventListener('error', (e) => { const t = document.getElementById('loadText'); if (t) t.textContent = 'Error: ' + (e.error ? e.error.stack : e.message); });
+init().catch((e) => {
+  console.error(e);
+  loadText.textContent = 'Error: ' + (e.stack || e.message);
+  loadText.style.color = '#ffb0a0';
+});

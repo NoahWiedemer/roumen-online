@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Icon Preview</title>
+  <style>
+    html, body { margin: 0; background: #14101c; color: #e8dcc8; font: 12px/1.3 system-ui, sans-serif; }
+    body { padding: 14px 18px; background: radial-gradient(ellipse at 30% 0%, #2a2240 0%, #14101c 60%); min-height: 100vh; box-sizing: border-box; }
+    h2 { margin: 10px 0 6px; font-size: 14px; letter-spacing: .06em; color: #ffd98a; text-shadow: 0 1px 0 #000; }
+    .grid { display: flex; flex-wrap: wrap; gap: 8px 6px; }
+    .cell { display: flex; flex-direction: column; align-items: center; width: var(--w); }
+    .cell img { display: block; image-rendering: auto; }
+    .cell span { margin-top: 3px; font-size: 10px; color: #b8a890; text-align: center; word-break: break-all; max-width: var(--w); }
+    .row40 { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; margin-top: 6px; border-radius: 8px;
+      background: linear-gradient(#3a2f28, #221a14); border: 1px solid #6a5238; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.6); }
+    .row40 img { display: block; }
+    .section { margin-bottom: 10px; }
+    .menubar img { background: none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/dev/iconsPreview.js"></script>
+</body>
+</html>
