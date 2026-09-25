@@ -633,11 +633,16 @@ export function createHumanoid(o = {}) {
   if (o.weapon === 'sword') weapon = buildSword(mats, o.swordStyle || 'broad');
   else if (o.weapon === 'spear') weapon = buildSpear(mats);
   if (weapon) weaponHolder.add(weapon);
+  // off-hand holder (dual blades)
+  const weaponHolderL = new THREE.Group();
+  weaponHolderL.position.set(0, -0.045, 0.0);
+  weaponHolderL.rotation.x = Math.PI / 2;
+  J.handL.add(weaponHolderL);
 
   root.traverse((ob) => { if (ob.isMesh) ob.frustumCulled = true; });
 
   const rigOut = {
-    root, body, joints: J, mats, weapon, weaponHolder, headPivot, headMesh, face, hair,
+    root, body, joints: J, mats, weapon, weaponHolder, weaponHolderL, headPivot, headMesh, face, hair,
     tails, flaps, setExpression, hipY: HIP_Y, headRadius: R, scale: S,
     height: (HIP_Y + 0.5 + R * 2) * S,
   };
@@ -653,7 +658,7 @@ function optimizeRig(rig) {
   for (const f of rig.flaps || []) animated.add(f.pivot);
   const roots = [...jointSet, rig.headPivot];
   if (rig.weapon) roots.push(rig.weapon);
-  const stop = (o) => jointSet.has(o) || o === rig.headPivot || o === rig.weaponHolder || o === rig.weapon || animated.has(o);
+  const stop = (o) => jointSet.has(o) || o === rig.headPivot || o === rig.weaponHolder || o === rig.weaponHolderL || o === rig.weapon || animated.has(o);
   rig.root.updateMatrixWorld(true);
   for (const j of roots) {
     const inv = new THREE.Matrix4().copy(j.matrixWorld).invert();

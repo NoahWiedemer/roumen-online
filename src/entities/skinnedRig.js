@@ -49,6 +49,8 @@ export function createSkinnedRig(T, look = {}, extra = {}) {
   const { boneMap, rootBone } = T.spec;
   const root = new THREE.Group();
   root.name = look.name || 'skinned';
+  const scale = extra.scale || 1;           // uniform size factor (e.g. NPCs a few heads taller than the player)
+  root.scale.setScalar(scale);
   const body = new THREE.Group();
   root.add(body);
   const model = SkeletonUtils.clone(T.scene);
@@ -72,17 +74,24 @@ export function createSkinnedRig(T, look = {}, extra = {}) {
     if (JOINT_PARENT[name]) J[JOINT_PARENT[name]].add(J[name]);
   }
 
-  // optional sword in the right fist: a frame under the hand bone that carries the proxy handR orientation
+  // weapon holders in both fists: a frame under each hand bone carries the proxy hand orientation, so a weapon
+  // placed in the holder sits exactly like on the procedural rig (grip at the origin, blade along local +Y)
   const mats = makeMats(look);
-  let weapon = null, weaponHolder = null;
-  if (look.weapon === 'sword') {
+  const holder = (side) => {
+    const bone = bones[boneMap['hand' + side]];
+    if (!bone) return null;
     const handFrame = new THREE.Group();
-    handFrame.quaternion.copy(T.offset.handR).invert();
-    bones[boneMap.handR].add(handFrame);
-    weaponHolder = new THREE.Group();
-    weaponHolder.position.set(0, -(extra.gripDrop ?? 0.075), 0);
-    weaponHolder.rotation.x = Math.PI / 2;
-    handFrame.add(weaponHolder);
+    handFrame.quaternion.copy(T.offset['hand' + side]).invert();
+    bone.add(handFrame);
+    const h = new THREE.Group();
+    h.position.set(0, -(extra.gripDrop ?? 0.075), 0);
+    h.rotation.x = Math.PI / 2;
+    handFrame.add(h);
+    return h;
+  };
+  const weaponHolder = holder('R'), weaponHolderL = holder('L');
+  let weapon = null;
+  if (look.weapon === 'sword' && weaponHolder) {
     weapon = buildSword(mats, look.swordStyle || 'broad');
     weaponHolder.add(weapon);
   }
@@ -112,9 +121,9 @@ export function createSkinnedRig(T, look = {}, extra = {}) {
   afterPose();
 
   return {
-    root, body, joints: J, mats, weapon, weaponHolder, skinned, bones,
+    root, body, joints: J, mats, weapon, weaponHolder, weaponHolderL, skinned, bones,
     tails: [], flaps: [], setExpression() {}, afterPose,
-    hipY, height: T.height, headRadius: 0.16, scale: 1,
-    portraitY: extra.portraitY ?? T.height * 0.88, portraitDist: extra.portraitDist ?? 0.72,
+    hipY, height: T.height * scale, headRadius: 0.16 * scale, scale,
+    portraitY: (extra.portraitY ?? T.height * 0.88) * scale, portraitDist: (extra.portraitDist ?? 0.72) * scale,
   };
 }

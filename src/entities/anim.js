@@ -32,7 +32,9 @@ function resolveKeys(keys, base) {
 }
 
 export class Clip {
-  constructor(name, { duration, keys, loop = false, events = [], base = null, expression = null, sword = null }) {
+  constructor(name, opts) {
+    const { duration, keys, loop = false, events = [], base = null, expression = null, sword = null } = opts;
+    this.opts = opts;       // kept so a clip can be re-based for another weapon style (see restyleClip)
     this.name = name;
     this.duration = duration;
     this.loop = loop;
@@ -112,12 +114,50 @@ export const P_DEAD = {
   legR: [-0.25, 0, -0.15], kneeR: [0.6, 0, 0], footR: [0.3, 0, 0],
 };
 
+// ---- dual blades: relaxed with both blades hanging down-back, and a low wide battle stance
+export const P_DUAL_IDLE = {
+  pos: [0, -0.01, 0],
+  hips: [0, 0.05, 0], spine: [0.05, -0.03, 0], chest: [0, -0.03, 0], neck: [0, 0, 0], head: [0.03, 0, 0],
+  armR: [0.12, 0, -0.2], elbowR: [-0.4, 0, 0], handR: [2.05, 0, -0.12],
+  armL: [0.12, 0, 0.2], elbowL: [-0.4, 0, 0], handL: [2.05, 0, 0.12],
+  legL: [-0.04, 0.06, 0.08], kneeL: [0.06, 0, 0], footL: [0, 0, -0.04],
+  legR: [0.05, -0.1, -0.09], kneeR: [0.08, 0, 0], footR: [-0.02, 0, 0.05],
+};
+export const P_DUAL_BATTLE = {
+  pos: [0, -0.07, 0],
+  hips: [0, 0.3, 0], spine: [0.2, -0.18, 0], chest: [0.08, -0.12, 0], neck: [0, -0.05, 0], head: [-0.1, -0.12, 0],
+  armR: [-0.6, 0.25, -0.45], elbowR: [-1.25, 0, 0], handR: [0.55, -0.25, 0],
+  armL: [-0.2, -0.2, 0.62], elbowL: [-0.85, 0, 0], handL: [1.95, 0.25, 0.15],
+  legL: [-0.48, -0.25, 0.2], kneeL: [0.58, 0, 0], footL: [-0.08, 0.22, 0],
+  legR: [0.3, -0.38, -0.2], kneeR: [0.46, 0, 0], footR: [-0.08, 0.3, 0],
+};
+
 // make library poses complete (all channels present)
 export function fullPose(p) {
   for (const ch of CHANNELS) if (!p[ch]) p[ch] = zero();
   return p;
 }
-fullPose(P_IDLE); fullPose(P_BATTLE); fullPose(P_SIT); fullPose(P_DEAD);
+fullPose(P_IDLE); fullPose(P_BATTLE); fullPose(P_SIT); fullPose(P_DEAD); fullPose(P_DUAL_IDLE); fullPose(P_DUAL_BATTLE);
+
+// Re-base a clip for another weapon style: every channel that was taken verbatim from a library pose
+// (e.g. `...P_BATTLE`) is swapped for the matching channel of the style's pose. Hit reactions, pick-up,
+// level-up etc. then keep their motion but hold the blades the way the style does.
+const STYLE_POSES = { dual: new Map([[P_BATTLE, P_DUAL_BATTLE], [P_IDLE, P_DUAL_IDLE]]) };
+const restyled = new Map();
+function restyleClip(clip, style) {
+  const key = clip.name + '|' + style;
+  if (restyled.has(key)) return restyled.get(key);
+  const map = STYLE_POSES[style];
+  const o = clip.opts;
+  const keys = o.keys.map((k) => {
+    const out = { ...k };
+    for (const ch of CHANNELS) for (const [from, to] of map) if (out[ch] && out[ch] === from[ch]) out[ch] = to[ch];
+    return out;
+  });
+  const c = new Clip(clip.name, { ...o, keys, base: map.get(o.base) || o.base });
+  restyled.set(key, c);
+  return c;
+}
 
 const B = P_BATTLE;
 const mix = (p, o) => ({ ...p, ...o });
@@ -284,7 +324,51 @@ export const CLIPS = {
       { t: 1.6, ...P_IDLE },
     ],
   }),
-  // ---- idle showpieces for wandering NPCs (Sir Ratman)
+  // ---- dual blades: 4-hit combo (right slash, left backhand, X-cross, spinning finisher)
+  dual_attack1: new Clip('dual_attack1', {
+    duration: 0.46, base: P_DUAL_BATTLE, expression: 'angry', sword: [0.08, 0.3],
+    events: [{ t: 0.2, name: 'hit' }],
+    keys: [
+      { t: 0, ...P_DUAL_BATTLE },
+      { t: 0.1, e: 'out', pos: [0, -0.05, -0.03], hips: [0, -0.55, 0], spine: [0.1, -0.35, 0], chest: [0.02, -0.2, 0], armR: [-1.35, 0, -1.35], elbowR: [-0.45, 0, 0], handR: [1.45, 0, 0], armL: [-0.45, 0, 0.45], elbowL: [-1.25, 0, 0], handL: [1.9, 0.2, 0.2] },
+      { t: 0.22, e: 'snap', pos: [0, -0.09, 0.14], hips: [0, 0.65, 0], spine: [0.18, 0.45, 0], chest: [0.06, 0.25, 0], armR: [-1.45, 0, 0.75], elbowR: [-0.1, 0, 0], handR: [1.5, 0, 0], armL: [0.25, 0, 0.8], elbowL: [-0.6, 0, 0], legL: [-0.75, -0.2, 0.15], kneeL: [0.85, 0, 0] },
+      { t: 0.32, e: 'out', pos: [0, -0.09, 0.14], hips: [0, 0.7, 0], spine: [0.2, 0.5, 0], armR: [-1.4, 0, 0.85], handR: [1.5, 0, 0] },
+      { t: 0.46, ...P_DUAL_BATTLE },
+    ],
+  }),
+  dual_attack2: new Clip('dual_attack2', {
+    duration: 0.46, base: P_DUAL_BATTLE, expression: 'angry', sword: [0.08, 0.3],
+    events: [{ t: 0.2, name: 'hit' }],
+    keys: [
+      { t: 0, ...P_DUAL_BATTLE },
+      { t: 0.1, e: 'out', pos: [0, -0.05, -0.03], hips: [0, 0.75, 0], spine: [0.1, 0.4, 0], chest: [0.02, 0.2, 0], armL: [-1.35, 0, 1.35], elbowL: [-0.45, 0, 0], handL: [1.45, 0, 0], armR: [-0.5, 0, -0.35], elbowR: [-1.3, 0, 0], handR: [1.9, -0.2, -0.2] },
+      { t: 0.22, e: 'snap', pos: [0, -0.09, 0.14], hips: [0, -0.45, 0], spine: [0.18, -0.45, 0], chest: [0.06, -0.25, 0], armL: [-1.45, 0, -0.75], elbowL: [-0.1, 0, 0], handL: [1.5, 0, 0], armR: [0.25, 0, -0.8], elbowR: [-0.6, 0, 0], legR: [-0.7, 0.2, -0.15], kneeR: [0.8, 0, 0], legL: [0.3, -0.2, 0.15], kneeL: [0.4, 0, 0] },
+      { t: 0.32, e: 'out', pos: [0, -0.09, 0.14], hips: [0, -0.5, 0], spine: [0.2, -0.5, 0], armL: [-1.4, 0, -0.85], handL: [1.5, 0, 0] },
+      { t: 0.46, ...P_DUAL_BATTLE },
+    ],
+  }),
+  dual_attack3: new Clip('dual_attack3', {
+    duration: 0.62, base: P_DUAL_BATTLE, expression: 'angry', sword: [0.16, 0.4],
+    events: [{ t: 0.27, name: 'hit' }, { t: 0.32, name: 'hit' }],
+    keys: [
+      { t: 0, ...P_DUAL_BATTLE },
+      { t: 0.15, e: 'out', pos: [0, 0.03, -0.05], hips: [0, 0.05, 0], spine: [-0.22, 0, 0], chest: [-0.15, 0, 0], head: [-0.2, 0, 0], armR: [-2.75, 0, -0.65], elbowR: [-0.55, 0, 0], handR: [1.2, 0, 0], armL: [-2.75, 0, 0.65], elbowL: [-0.55, 0, 0], handL: [1.2, 0, 0], legL: [-0.2, 0, 0.12], kneeL: [0.2, 0, 0], legR: [0.1, 0, -0.12], kneeR: [0.15, 0, 0] },
+      { t: 0.3, e: 'snap', pos: [0, -0.15, 0.2], hips: [0.1, 0.05, 0], spine: [0.45, 0, 0], chest: [0.2, 0, 0], head: [0.1, 0, 0], armR: [-0.75, 0, 0.6], elbowR: [-0.1, 0, 0], handR: [1.45, 0, 0], armL: [-0.75, 0, -0.6], elbowL: [-0.1, 0, 0], handL: [1.45, 0, 0], legL: [-0.95, -0.1, 0.12], kneeL: [1.05, 0, 0], legR: [0.55, -0.2, -0.1], kneeR: [0.5, 0, 0] },
+      { t: 0.44, e: 'out', pos: [0, -0.15, 0.2], spine: [0.48, 0, 0], armR: [-0.7, 0, 0.7], armL: [-0.7, 0, -0.7] },
+      { t: 0.62, ...P_DUAL_BATTLE },
+    ],
+  }),
+  dual_attack4: new Clip('dual_attack4', {
+    duration: 0.82, base: P_DUAL_BATTLE, expression: 'angry', sword: [0.12, 0.72],
+    events: [{ t: 0.36, name: 'hit' }, { t: 0.56, name: 'hit' }],
+    keys: [
+      { t: 0, ...P_DUAL_BATTLE },
+      { t: 0.12, e: 'out', pos: [0, -0.13, 0], hips: [0, -0.9, 0], spine: [0.15, -0.4, 0], chest: [0.05, -0.2, 0], armR: [-1.5, 0, -1.3], elbowR: [-0.1, 0, 0], handR: [1.5, 0, 0], armL: [-1.5, 0, 1.3], elbowL: [-0.1, 0, 0], handL: [1.5, 0, 0], legL: [-0.5, 0, 0.25], kneeL: [0.6, 0, 0], legR: [0.2, 0, -0.25], kneeR: [0.5, 0, 0] },
+      { t: 0.62, e: 'linear', root: [0, 0.18, 0], pos: [0, -0.13, 0], hips: [0, -0.9 + Math.PI * 2, 0], spine: [0.15, -0.4, 0], armR: [-1.5, 0, -1.35], armL: [-1.5, 0, 1.35] },
+      { t: 0.82, e: 'out', root: [0, 0, 0], ...P_DUAL_BATTLE, hips: [0, 0.3 + Math.PI * 2, 0] },
+    ],
+  }),
+  // ---- idle showpieces for wandering NPCs (Sir Ratman, Robo)
   // courtly bow: right hand to the chest, left arm swept back
   bow: new Clip('bow', {
     duration: 2.2, base: P_IDLE,
@@ -348,6 +432,9 @@ export class Animator {
     this.J = rig.joints;
     this.gait = gait;       // 'sword' (blade trails behind while running) | 'free' (both arms swing)
     this.idlePose = fullPose(idlePose);
+    this.baseIdlePose = this.idlePose;
+    this.battlePose = P_BATTLE;
+    this.style = 'sword';   // weapon style: 'sword' | 'dual' (poses, run cycle and clip re-basing)
     this.t = 0;
     this.speed = 0;         // 0..1 locomotion blend (running)
     this.moveDir = 1;       // 1 forward, -1 backwards
@@ -372,9 +459,17 @@ export class Animator {
     this.lookYaw = 0;
   }
 
+  setStyle(style) {
+    if (style === this.style) return;
+    this.style = style;
+    this.idlePose = style === 'dual' ? P_DUAL_IDLE : this.baseIdlePose;
+    this.battlePose = style === 'dual' ? P_DUAL_BATTLE : P_BATTLE;
+  }
+
   play(name, { speed = 1, onEvent = null, fadeIn = 0.06, fadeOut = 0.16 } = {}) {
-    const clip = CLIPS[name];
+    let clip = CLIPS[name];
     if (!clip) return null;
+    if (this.style !== 'sword' && STYLE_POSES[this.style] && !name.startsWith(this.style + '_')) clip = restyleClip(clip, this.style);
     this.action = { clip, t: 0, speed, weight: this.action ? this.action.weight : 0, fadeIn, fadeOut, onEvent, fired: new Set(), done: false };
     return this.action;
   }
@@ -395,7 +490,7 @@ export class Animator {
 
     // idle / battle / sit blend
     const idle = this.idlePose;
-    blendPose(idle, P_BATTLE, this.battle, J);
+    blendPose(idle, this.battlePose, this.battle, J);
     // breathing & weight shift
     const br = Math.sin(t * 2.1);
     J.spine[0] += br * 0.015;
@@ -441,6 +536,13 @@ export class Animator {
         // unarmed walkers swing both arms in opposition to the legs
         run.armR = [-sw * 0.85 * dir, -0.1, -0.28]; run.elbowR = [-1.05 - Math.max(0, sw) * 0.45, 0, 0]; run.handR = [0.1, 0, 0];
         run.armL[1] = 0.1;
+      } else if (this.style === 'dual') {
+        // ninja run: torso leaning in, both arms swept back with the blades trailing behind
+        run.spine = [0.34 * dir * s, sw * 0.08, -cw * 0.02];
+        run.chest = [0.08, sw * 0.1, 0];
+        run.head = [-0.3 * dir * s, -sw * 0.05, 0];
+        run.armR = [0.95 - sw * 0.14, 0, -0.34]; run.elbowR = [-0.45 - Math.max(0, sw) * 0.12, 0, 0]; run.handR = [2.25, 0, -0.25];
+        run.armL = [0.95 + sw * 0.14, 0, 0.34]; run.elbowL = [-0.45 - Math.max(0, -sw) * 0.12, 0, 0]; run.handL = [2.25, 0, 0.25];
       }
       if (this.runOverride) for (const k of ['armR', 'elbowR', 'handR']) if (this.runOverride[k]) run[k] = this.runOverride[k];
       const w = Math.min(1, s * 1.8);

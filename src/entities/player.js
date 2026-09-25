@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { createFighter } from './fighter.js';
 import { Trail } from './effects.js';
+import { dualBladesReady, attachDualBlades, bladeTime } from './weapons.js';
 import { G } from '../game/game.js';
 import { clamp, dampAngle, angleDiff, lerp } from '../core/utils.js';
 import {
@@ -56,6 +57,9 @@ export class Player {
     this.pathTimer = 0;
     this._fwd = new THREE.Vector3();
     this.trail = null;
+    this.trailL = null;        // off-hand trail (dual blades)
+    this.dual = null;          // { right, left } blade meshes once dual blades were equipped
+    this.flags = {};           // one-time story flags, e.g. 'gift:robo'
     this.stuckT = 0;
     for (const [id, n] of STARTING.inventory) this.addItem(id, n, true);
     for (const [slot, id] of Object.entries(STARTING.equipment)) this.equipment[slot] = id;
@@ -66,8 +70,10 @@ export class Player {
   attach(scene) {
     scene.add(this.root);
     this.trail = new Trail(scene, '#fff4c8', 16);
+    this.trailL = new Trail(scene, '#2a7bff', 16);
     this.applyWeaponLook();
   }
+  isDual() { return ITEMS[this.equipment.weapon]?.weaponClass === 'dual'; }
 
   // ---------------------------------------------------------------- stats
   baseStats() {
@@ -171,6 +177,19 @@ export class Player {
   applyWeaponLook() {
     const it = ITEMS[this.equipment.weapon];
     const w = this.rig.weapon;
+    // dual blades: one glowing blade per fist, own stance / run cycle / combo
+    if (it && it.weaponClass === 'dual') {
+      if (!this.dual && dualBladesReady()) this.dual = attachDualBlades(this.rig, it.look);
+      if (this.dual) this.dual.right.visible = this.dual.left.visible = true;
+      if (w) w.visible = false;
+      this.anim.setStyle('dual');
+      this.comboIdx = 0;
+      if (this.trail) this.trail.setColor(it.look.glowR);
+      if (this.trailL) this.trailL.setColor(it.look.glowL);
+      return;
+    }
+    if (this.dual) this.dual.right.visible = this.dual.left.visible = false;
+    this.anim.setStyle('sword');
     if (!w) return;
     w.visible = !!it;
     if (!it) return;
@@ -430,8 +449,8 @@ export class Player {
     }
   }
 
-  // returns true if hit
-  dealDamage(m, sk = null) {
+  // returns true if hit; scale = damage factor for multi-hit swings
+  dealDamage(m, sk = null, scale = 1) {
     if (!m || m.dead) return false;
     const st = this.stats;
     const hitChance = clamp(0.88 + (st.aim - m.stats.evasion) * 0.012, 0.55, 0.98);
@@ -444,7 +463,7 @@ export class Player {
     let base = st.atkMin + Math.random() * (st.atkMax - st.atkMin);
     if (sk) base = base * (sk.mult || 1) + (sk.flat || 0);
     let def = m.stats.def + (m.debuffDef || 0);
-    let dmg = Math.max(1, base - def * 0.6) * this.dmgMult();
+    let dmg = Math.max(1, base - def * 0.6) * this.dmgMult() * scale;
     const crit = Math.random() < st.crit;
     if (crit) dmg *= 1.6;
     dmg = Math.round(dmg * (0.92 + Math.random() * 0.16));
@@ -666,15 +685,25 @@ export class Player {
     this.anim.update(dt, this.pos);
     if (this.airborne) this.rig.body.position.y += 0; // body offset handled by pos
 
-    // weapon trail
-    const w = this.rig.weapon;
-    if (w && this.trail) {
+    // weapon trails (dual blades: one coloured trail per blade)
+    bladeTime.value = G.time;
+    const pushTrail = (trail, w) => {
       w.updateWorldMatrix(true, false);
       const base = w.userData.baseLocal.clone().applyMatrix4(w.matrixWorld);
       const tip = w.userData.tipLocal.clone().applyMatrix4(w.matrixWorld);
-      this.trail.push(base, tip, this.anim.swordActive);
-      if (this.anim.swordActive && this.swingColor) this.trail.setColor(this.swingColor);
-      else if (!this.anim.swordActive) this.trail.setColor((ITEMS[this.equipment.weapon]?.look?.rune) || '#fff4c8');
+      trail.push(base, tip, this.anim.swordActive);
+    };
+    if (this.isDual() && this.dual) {
+      if (this.trail) pushTrail(this.trail, this.dual.right);
+      if (this.trailL) pushTrail(this.trailL, this.dual.left);
+    } else {
+      const w = this.rig.weapon;
+      if (w && this.trail) {
+        pushTrail(this.trail, w);
+        if (this.anim.swordActive && this.swingColor) this.trail.setColor(this.swingColor);
+        else if (!this.anim.swordActive) this.trail.setColor((ITEMS[this.equipment.weapon]?.look?.rune) || '#fff4c8');
+      }
+      if (this.trailL) this.trailL.push(this.pos, this.pos, false);   // let a leftover off-hand trail fade out
     }
   }
 
@@ -700,22 +729,38 @@ export class Player {
   }
 
   basicAttack(t) {
-    this.comboIdx = (this.comboIdx % 3) + 1;
-    const clip = 'attack' + this.comboIdx;
-    this.attackTimer = 1.05 - Math.min(0.3, this.stats.aim * 0.004);
+    const dual = this.isDual();
+    // sword: 3-hit combo; dual blades: faster 4-hit combo (hits 3 and 4 strike twice for a bit less each)
+    const n = dual ? 4 : 3;
+    this.comboIdx = (this.comboIdx % n) + 1;
+    const clip = (dual ? 'dual_attack' : 'attack') + this.comboIdx;
+    const perHit = dual ? (this.comboIdx >= 3 ? 0.62 : 0.85) : 1;
+    this.attackTimer = dual ? [0, 0.44, 0.44, 0.6, 0.8][this.comboIdx] - Math.min(0.12, this.stats.aim * 0.002) : 1.05 - Math.min(0.3, this.stats.aim * 0.004);
     this.inCombatT = 6;
     this.anim.battleTarget = 1;
     this.swingColor = null;
-    G.audio.play('swing');
+    G.audio.play(dual && this.comboIdx === 4 ? 'swingBig' : 'swing');
     this.anim.play(clip, {
-      speed: 1.1,
+      speed: dual ? 1.05 : 1.1,
       onEvent: (ev) => {
         if (ev === 'hit' && t && !t.dead) {
           const d = Math.hypot(t.pos.x - this.pos.x, t.pos.z - this.pos.z);
-          if (d < this.meleeRange(t) + 0.8) this.dealDamage(t);
+          if (d < this.meleeRange(t) + 0.8) this.dealDamage(t, null, perHit);
+          if (dual) this.bladeSparks(t);
         }
       },
     });
+  }
+  // coloured sparks from both blades on impact
+  bladeSparks(t) {
+    if (!this.dual || !G.fx) return;
+    const p = t.pos.clone(); p.y = t.groundY + t.height * 0.55;
+    for (const [col, side] of [[this.dual.right.userData.color, -1], [this.dual.left.userData.color, 1]]) {
+      for (let i = 0; i < 7; i++) {
+        const a = Math.random() * Math.PI * 2;
+        G.fx.particles.emit({ x: p.x + side * 0.15, y: p.y, z: p.z, vx: Math.cos(a) * 3, vy: 1 + Math.random() * 2.5, vz: Math.sin(a) * 3, life: 0.45, size: 0.22, color: col, grav: 6, drag: 1.5 });
+      }
+    }
   }
 
   updateBuffs(dt) {
@@ -748,7 +793,7 @@ export class Player {
         name: this.name, level: this.level, exp: this.exp, statPoints: this.statPoints, alloc: this.alloc, money: this.money,
         stones: this.stones, inventory: this.inventory, equipment: this.equipment, learned: [...this.learned], skillbar: this.skillbar,
         hp: this.hp, sp: this.sp, pos: [this.pos.x, this.pos.z], quests: G.quests ? G.quests.serialize() : null, title: this.title,
-        world: G.world ? G.world.id : 'roumen', rotY: this.rotY,
+        world: G.world ? G.world.id : 'roumen', rotY: this.rotY, flags: this.flags,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch { /* storage unavailable */ }
@@ -767,6 +812,7 @@ export class Player {
     this.sp = Math.min(data.sp || this.stats.maxSp, this.stats.maxSp);
     if (data.pos) this.pos.set(data.pos[0], 0, data.pos[1]);
     if (typeof data.rotY === 'number') this.rotY = data.rotY;
+    this.flags = data.flags || {};
     this._savedWorld = data.world || 'roumen';
     this._savedQuests = data.quests;
     return true;

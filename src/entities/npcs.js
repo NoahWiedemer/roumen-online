@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { createHumanoid } from './humanoid.js';
 import { Animator, P_IDLE, fullPose } from './anim.js';
-import { createRatmanRig } from './ratmanModel.js';
+import { createNpcRig } from './npcModels.js';
 import { NPCS } from '../game/data.js';
 import { G } from '../game/game.js';
 import { dampAngle } from '../core/utils.js';
@@ -48,7 +48,18 @@ const P_RAT = fullPose({
   armL: [0.08, 0, 0.16], elbowL: [-0.3, 0, 0], handL: [0, 0, 0],
   legL: [-0.03, 0.05, 0.06], kneeL: [0.08, 0, 0], legR: [0.03, -0.05, -0.06], kneeR: [0.08, 0, 0],
 });
-const MODELS = { ratman: { create: createRatmanRig, pose: P_RAT } };
+// proud, broad-shouldered stance for the werewolf king (arms held a little away from the body)
+const P_KING = fullPose({
+  ...P_IDLE,
+  hips: [0, 0, 0], spine: [-0.04, 0, 0], chest: [-0.06, 0, 0], neck: [0.04, 0, 0], head: [0.02, 0, 0],
+  armR: [0.05, 0, -0.34], elbowR: [-0.3, 0, 0], handR: [0, 0, 0],
+  armL: [0.05, 0, 0.34], elbowL: [-0.3, 0, 0], handL: [0, 0, 0],
+  legL: [-0.02, 0.1, 0.12], kneeL: [0.06, 0, 0], legR: [0.02, -0.1, -0.12], kneeR: [0.06, 0, 0],
+});
+const MODELS = {
+  ratman: { create: (look) => createNpcRig('ratman', look), pose: P_RAT },
+  robo: { create: (look) => createNpcRig('robo', look), pose: P_KING },
+};
 const POSES = ['bow', 'flex', 'lookout', 'stretch', 'wave'];
 
 export class NPC {
@@ -61,9 +72,9 @@ export class NPC {
     const terrain = env.terrain || G.terrain;
     const model = def.model && MODELS[def.model];
     if (model) {
-      this.rig = model.create({ name: def.id });
+      this.rig = model.create({ name: def.id, scale: def.scale });
       this.anim = new Animator(this.rig, { idlePose: model.pose, gait: 'free' });
-      this.scale = 1;
+      this.scale = this.rig.scale || 1;
       this.height = this.rig.height;
     } else {
       const look = LOOKS[def.look] || LOOKS.merchant;
@@ -73,7 +84,8 @@ export class NPC {
       this.height = 1.8 * this.scale;
     }
     this.root = this.rig.root;
-    this.radius = 0.45;
+    this.rootScale = this.root.scale.x;   // skinned models may be scaled up; child sprites compensate for it
+    this.radius = 0.45 * Math.max(1, this.scale);
     this.pos = new THREE.Vector3(spot.x, terrain.groundAt(spot.x, spot.z), spot.z);
     this.home = this.pos.clone();
     this.homeRot = spot.rotY || 0;
@@ -103,6 +115,8 @@ export class NPC {
     s.position.y = this.height + 0.85;
     s.visible = false;
     s.renderOrder = 8;
+    s.scale.divideScalar(this.rootScale);
+    s.position.y /= this.rootScale;
     this.root.add(s);
     this.marker = s;
     this.markerKind = null;
@@ -135,16 +149,21 @@ export class NPC {
     if (this.wander) this.updateWander(dt, d);
     else {
       // face the player when close
-      if (d < 6) this.faceGoal = Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
+      if (d < 6 * Math.max(1, this.scale)) this.faceGoal = Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
       else this.faceGoal = this.homeRot;
       this.rotY = dampAngle(this.rotY, this.faceGoal, 4, dt);
       this.waveCd -= dt;
-      if (d < 7 && this.waveCd <= 0 && !this.anim.busy) {
-        this.anim.play('wave');
+      const greet = this.def.greetPose || 'wave';
+      if (d < 7 * Math.max(1, this.scale) && this.waveCd <= 0 && !this.anim.busy) {
+        this.anim.play(greet);
         this.waveCd = 12 + Math.random() * 10;
+      } else if (this.def.poses && d >= 7 && this.waveCd <= 0 && !this.anim.busy) {
+        // showpiece poses now and then while nobody is around
+        this.anim.play(this.def.poses[(Math.random() * this.def.poses.length) | 0]);
+        this.waveCd = 6 + Math.random() * 8;
       }
     }
-    if (this.marker.visible) this.marker.position.y = this.height + 0.85 + Math.sin(G.time * 3) * 0.08;
+    if (this.marker.visible) this.marker.position.y = (this.height + 0.85 + Math.sin(G.time * 3) * 0.08) / this.rootScale;
     this.root.visible = d < 120;
     if (d < 70) this.anim.update(dt, null);
     this.root.position.copy(this.pos);
@@ -215,6 +234,9 @@ export class NpcManager {
   update(dt) { for (const n of this.list) n.update(dt); }
   interact(npc) { G.emit('npcInteract', npc); }
   refreshMarkers() {
-    for (const n of this.list) n.setMarker(G.quests.markerFor(n.id));
+    for (const n of this.list) {
+      const gift = n.def.gift && G.player && !G.player.flags['gift:' + n.id] ? 'available' : null;
+      n.setMarker(G.quests.markerFor(n.id) || gift);
+    }
   }
 }

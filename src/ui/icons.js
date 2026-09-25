@@ -2334,6 +2334,40 @@ ITEMS.imp_blade = (ctx) => itemFrame(ctx, '#ffc040', () => {
   sparkle(ctx, 74, 22, 5, '#ffffff', '#ffe070');
 });
 
+// twin curved blades with serrated edges, one glowing red, one blue (dual-blade weapon class)
+ITEMS.robo_blades = (ctx) => itemFrame(ctx, '#b050ff', () => {
+  const blade = (l, glowCol, mirror) => {
+    l.save();
+    if (mirror) l.scale(-1, 1);
+    // grip + pommel
+    rr(l, -2.6, 2, 5.2, 14, 1.4); l.fillStyle = lin(l, -3, 0, 3, 0, ['#4a4a55', '#1a1a22']); l.fill(); l.lineWidth = 0.7; l.strokeStyle = '#08080c'; l.stroke();
+    l.beginPath(); l.arc(0, 18, 3.2, 0, TAU); l.fillStyle = '#d8d0c8'; l.fill(); l.stroke();
+    // bone-white guard
+    l.beginPath(); l.moveTo(-10, -1); l.quadraticCurveTo(-5, 4, 0, 2.5); l.quadraticCurveTo(5, 4, 10, -1); l.quadraticCurveTo(4, -3, 0, -3.5); l.quadraticCurveTo(-4, -3, -10, -1); l.closePath();
+    l.fillStyle = lin(l, 0, -4, 0, 4, ['#fff8ee', '#c8bcae', '#7a6e62']); l.fill(); l.stroke();
+    // curved blade: smooth back edge, serrated front edge
+    const back = [[3.5, -3], [5.5, -20], [5, -38], [2, -52], [-3, -64]];
+    const front = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10, y = -3 - t * 60;
+      front.push([-4.5 + t * 1.5 - Math.sin(t * Math.PI) * 1.5 + (i % 2 ? -2.6 : 0) * (1 - t * 0.5), y]);
+    }
+    const outline = [...back, ...front.reverse()];
+    l.save(); l.shadowColor = glowCol; l.shadowBlur = 10;
+    poly(l, outline); l.fillStyle = lin(l, -6, 0, 6, 0, ['#2e2436', '#0c0a10']); l.fill();
+    l.restore();
+    poly(l, outline); l.lineWidth = 1.2; l.strokeStyle = glowCol; l.stroke();
+    l.beginPath(); back.forEach(([x, y], i) => (i ? l.lineTo(x - 1.2, y) : l.moveTo(x - 1.2, y))); l.strokeStyle = 'rgba(255,255,255,0.65)'; l.lineWidth = 0.6; l.stroke();
+    l.restore();
+  };
+  obj(ctx, (l) => {
+    l.save(); l.translate(36, 80); l.rotate(30 * D); blade(l, '#ff3048', false); l.restore();
+    l.save(); l.translate(64, 80); l.rotate(-30 * D); blade(l, '#3a8aff', true); l.restore();
+  }, { glow: '#d060ff', glowR: 5, glowA: 0.55 });
+  sparkle(ctx, 22, 22, 5, '#ffffff', '#ff5a6a');
+  sparkle(ctx, 80, 26, 4.5, '#ffffff', '#6aa8ff');
+});
+
 ITEMS.mushroom_cap = (ctx) => itemFrame(ctx, '#ff6a8a', () => {
   obj(ctx, (l) => {
     l.save(); l.translate(50, 52); l.rotate(-16 * D); l.translate(-50, -52);

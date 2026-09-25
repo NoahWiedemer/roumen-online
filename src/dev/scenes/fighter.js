@@ -1,13 +1,22 @@
-// Fighter model preview: ?scene=fighter&anim=attack1&time=0.25&speed=1&battle=1&sit=0 (&model=0 = procedural chibi)
+// Fighter model preview: ?scene=fighter&anim=attack1&time=0.25&speed=1&battle=1&sit=0
+//   &model=0 = procedural chibi, &dual=1 = Robo Blades (dual style: anim=dual_attack1..4)
 import * as THREE from 'three';
 import { createFighter } from '../../entities/fighter.js';
 import { preloadPlayerModel } from '../../entities/playerModel.js';
+import { preloadDualBlades, attachDualBlades, bladeTime } from '../../entities/weapons.js';
 
 export default async function (ctx) {
   const { scene, q } = ctx;
   if (q.get('model') !== '0') await preloadPlayerModel();
   const f = createFighter();
   scene.add(f.root);
+  if (q.get('dual')) {
+    await preloadDualBlades();
+    if (f.rig.weapon) f.rig.weapon.visible = false;
+    attachDualBlades(f.rig, {});
+    f.anim.setStyle('dual');
+    ctx.onUpdate((dt, t) => { bladeTime.value = t; });
+  }
   const others = [];
   if (q.get('lineup')) {
     for (const [i, cfg] of [[-1.6, { battle: 1 }], [1.6, { speed: 1 }]]) {

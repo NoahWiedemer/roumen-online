@@ -533,6 +533,31 @@ export class Windows {
       const back = el('button', '', opts, 'Back'); back.onclick = () => { this.npcPage = 'main'; this.render('npc'); };
       return;
     }
+    // one-time gift (e.g. Robo hands over the Robo Blades): offered until accepted, never again afterwards
+    const gift = npc.def.gift, giftKey = 'gift:' + npc.id;
+    if (gift && !G.player.flags[giftKey]) {
+      el('div', 'dlg-text', body, esc(gift.text));
+      body.appendChild(this.rewardHtml({ reward: { items: [[gift.item, 1]] } }));
+      const opts = el('div', 'dlg-opts', body);
+      const b = el('button', '', opts, `<span class="qi">★</span>${esc(gift.button || 'Accept')}`);
+      b.onclick = () => {
+        const p = G.player;
+        if (p.flags[giftKey]) return;
+        if (p.freeSlots() < 1) { G.msg('Make room in your inventory first.', 'warn'); G.audio.play('error'); return; }
+        p.addItem(gift.item, 1);
+        p.flags[giftKey] = true;
+        G.msg(`${npc.name} gave you ${ITEMS[gift.item].name}. Equip it from your inventory (I).`, 'loot');
+        G.audio.play('quest');
+        G.fx.pillar(p.pos.clone(), '#ffd86a', 1.4, 0.8, 6);
+        this.npcGreet = gift.done || this.npcGreet;
+        G.quests.refresh();
+        G.ui.updateQuestNotice();
+        p.save();
+        this.render('npc');
+      };
+      const bye = el('button', '', opts, 'Goodbye'); bye.onclick = () => this.close('npc');
+      return;
+    }
     el('div', 'dlg-text', body, esc(this.npcGreet || npc.def.greet));
     const opts = el('div', 'dlg-opts', body);
     for (const { id, q, state } of Q.forNpc(npc.id)) {

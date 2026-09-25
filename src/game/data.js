@@ -111,6 +111,10 @@ export const ITEMS = {
   greatsword_flame: { name: 'Flame Greatsword', type: 'weapon', icon: 'greatsword_flame', lv: 9, atk: [26, 38], str: 2, price: 4200, desc: 'Runes of fire glow along the blade.', look: { blade: '#e8e0dc', rune: '#ff6a1a' } },
   imp_blade: { name: 'Imp Fang Blade', type: 'weapon', icon: 'imp_blade', lv: 6, atk: [18, 26], dex: 2, price: 1600, desc: 'A jagged golden blade pried from an imp.', look: { blade: '#f0cf6a', rune: '#ff4a3a' } },
   sword_knight: { name: 'Knight\'s Longsword', type: 'weapon', icon: 'sword_knight', lv: 12, atk: [36, 50], str: 3, dex: 2, price: 9000, desc: 'Blessed steel with a sapphire in the hilt.', look: { blade: '#eef4ff', rune: '#4fb0ff' } },
+  // dual blades: a weapon class of its own (one blade per hand, fast alternating combo)
+  robo_blades: { name: 'Robo Blades', type: 'weapon', weaponClass: 'dual', icon: 'robo_blades', lv: 1, atk: [11, 17], dex: 2, price: 2500,
+    desc: 'Twin fangs of Robo, King of Beasts. One burns red like the setting sun, one glows blue like the deep sea.',
+    look: { model: 'robosword', glowR: '#ff2a3c', glowL: '#2a7bff' } },
 
   armor_cloth: { name: 'Padded Vest', type: 'armor', icon: 'armor_cloth', lv: 1, def: 3, price: 25, desc: 'Better than nothing.' },
   armor_leather: { name: 'Leather Cuirass', type: 'armor', icon: 'armor_leather', lv: 4, def: 8, hp: 10, price: 420, desc: 'Hardened leather armor.' },
@@ -227,6 +231,23 @@ export const NPCS = [
       'Up on Cyclone Hill the wind never sleeps. Neither do the things that live there.',
       'I shall have tasks for brave souls soon. Until then, enjoy the waterfalls.',
       'This pickaxe? Merely a gentleman\'s walking stick. Mostly.',
+    ] },
+  // Robo, King of Beasts: waits where the forest trail meets Cyclone Hill and hands out the Robo Blades once
+  { id: 'robo', world: 'cyclone', pos: [10, 47], rot: -1.18, name: 'Robo', title: 'King of Beasts', model: 'robo', roles: ['quest'],
+    greetPose: 'flex', poses: ['lookout', 'stretch', 'flex'],
+    gift: {
+      item: 'robo_blades',
+      text: 'So, a cub found its way through the mist. Listen well: the rat-folk of this hill are my subjects too, and something has clouded their minds. They are not your enemy — they are lost. Take my old twin fangs. One burns like the setting sun, one like the deep sea. Use them to bring my people back, not to end them.',
+      button: 'Accept the Robo Blades',
+      done: 'The Robo Blades are yours now, cub. Two fangs, two hands — strike true, and spare the rat-folk.',
+    },
+    greet: 'The wind on Cyclone Hill carries many scents. Lately, most of them are fear.',
+    greetLines: [
+      'The wind on Cyclone Hill carries many scents. Lately, most of them are fear.',
+      'I am Robo, King of Beasts. Every creature of this land is under my care — even the stubborn ones.',
+      'Climb the hill, cub. Ring by ring, bridge by bridge.',
+      'The rat-folk were never this restless. Something up there is pulling their strings.',
+      'Sir Ratman talks too much, but his heart is in the right place. Listen to him.',
     ] },
 ];
 

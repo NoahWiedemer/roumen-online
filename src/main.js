@@ -19,7 +19,8 @@ import { registerWorld, registerBuilder, captureAtmosphere, restoreAtmosphere, g
 import { Effects } from './entities/effects.js';
 import { Player } from './entities/player.js';
 import { preloadPlayerModel } from './entities/playerModel.js';
-import { preloadRatmanModel } from './entities/ratmanModel.js';
+import { preloadNpcModels } from './entities/npcModels.js';
+import { preloadDualBlades } from './entities/weapons.js';
 import { MonsterManager } from './entities/monsters.js';
 import { NpcManager } from './entities/npcs.js';
 import { LootManager } from './entities/loot.js';
@@ -77,13 +78,14 @@ async function init() {
   try { assets.house = (await new GLTFLoader().loadAsync('/models/house.glb')).scene; } catch (e) { console.warn('house model', e); }
   if (MonsterModels.preloadMonsterAssets) { try { await MonsterModels.preloadMonsterAssets(); } catch (e) { console.warn('monster assets', e); } }
   try { await preloadPlayerModel(); } catch (e) { console.warn('player model (falling back to the procedural fighter)', e); }
+  try { await preloadDualBlades(); } catch (e) { console.warn('dual blades model', e); }
 
   const roumen = await buildRoumen(engine, assets);
   registerWorld(roumen);
   // other worlds are built on their first visit (see world/worlds.js)
   registerBuilder('cyclone', async (progress) => {
     await progress(2, 'Summoning the locals…');
-    try { await preloadRatmanModel(); } catch (e) { console.warn('ratman model', e); }
+    try { await preloadNpcModels(['ratman', 'robo']); } catch (e) { console.warn('NPC models', e); }
     const { buildCycloneWorld } = await import('./world/cyclone/index.js');
     const w = await buildCycloneWorld({ engine, progress });
     w.root.visible = false;
