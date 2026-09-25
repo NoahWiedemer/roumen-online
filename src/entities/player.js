@@ -238,6 +238,7 @@ export class Player {
     this.stopActions();
     G.fx.pillar(this.pos.clone(), '#8fd8ff', 1.2, 0.8, 6);
     G.audio.play('teleport');
+    if (G.world && G.world.id !== 'roumen' && G.travel) { G.travel('roumen', { at: { x: TOWN.spawn.x, z: TOWN.spawn.z } }); return; }
     setTimeout(() => {
       this.teleport(TOWN.spawn.x, TOWN.spawn.z);
       G.fx.pillar(this.pos.clone(), '#8fd8ff', 1.2, 0.8, 6);
@@ -494,7 +495,8 @@ export class Player {
     this.anim.revive();
     this.hp = Math.round(this.stats.maxHp * 0.5);
     this.sp = Math.round(this.stats.maxSp * 0.5);
-    this.teleport(TOWN.spawn.x, TOWN.spawn.z);
+    const s = (G.world && G.world.spawn) || TOWN.spawn;
+    this.teleport(s.x, s.z);
     G.fx.pillar(this.pos.clone(), '#ffffff', 1.4, 0.8, 7);
     G.emit('stats');
   }
@@ -570,6 +572,12 @@ export class Player {
           const d = Math.hypot(npc.pos.x - this.pos.x, npc.pos.z - this.pos.z);
           if (d < 2.8) { this.path = null; this.faceTowards(npc.pos, true); this.pending = null; G.npcs.interact(npc); }
           else if (!this.path || this.pathTimer <= 0) { this.moveTo(npc.pos.x, npc.pos.z); this.pathTimer = 0.6; }
+        } else if (this.pending && this.pending.kind === 'portal') {
+          // walk into the vortex, then travel
+          const pt = this.pending.portal, r = pt.group.rotation.y;
+          const fx = pt.pos.x + Math.sin(r) * 2.2, fz = pt.pos.z + Math.cos(r) * 2.2;
+          if (Math.hypot(fx - this.pos.x, fz - this.pos.z) < 1.9) { this.path = null; this.pending = null; this.faceTowards(pt.pos, true); G.usePortal && G.usePortal(pt); }
+          else if (!this.path) { if (!this.moveTo(fx, fz)) this.pending = null; }
         } else if (this.pending && this.pending.kind === 'loot') {
           const l = this.pending.loot;
           if (l.removed) this.pending = null;
@@ -740,6 +748,7 @@ export class Player {
         name: this.name, level: this.level, exp: this.exp, statPoints: this.statPoints, alloc: this.alloc, money: this.money,
         stones: this.stones, inventory: this.inventory, equipment: this.equipment, learned: [...this.learned], skillbar: this.skillbar,
         hp: this.hp, sp: this.sp, pos: [this.pos.x, this.pos.z], quests: G.quests ? G.quests.serialize() : null, title: this.title,
+        world: G.world ? G.world.id : 'roumen', rotY: this.rotY,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch { /* storage unavailable */ }
@@ -757,6 +766,8 @@ export class Player {
     this.hp = Math.min(data.hp || this.stats.maxHp, this.stats.maxHp);
     this.sp = Math.min(data.sp || this.stats.maxSp, this.stats.maxSp);
     if (data.pos) this.pos.set(data.pos[0], 0, data.pos[1]);
+    if (typeof data.rotY === 'number') this.rotY = data.rotY;
+    this._savedWorld = data.world || 'roumen';
     this._savedQuests = data.quests;
     return true;
   }

@@ -51,6 +51,15 @@ export class FollowCamera {
     }
     return best;
   }
+  // distance along the ray to where it first dips below the terrain (+ margin), or len
+  terrainOcclusion(o, d, len) {
+    const T = this.terrain;
+    if (!T) return len;
+    for (let t = 0.8; t < len; t += 0.45) {
+      if (T.heightAt(o.x + d.x * t, o.z + d.z * t) + 0.45 > o.y + d.y * t) return Math.max(0, t - 0.5);
+    }
+    return len;
+  }
   snap(pos) {
     this.focus.copy(pos);
     this.update(0, pos, null, true);
@@ -76,7 +85,7 @@ export class FollowCamera {
     // occlusion: pull the camera in front of buildings between it and the player
     const dir = { x: Math.sin(this.yaw) * cp, y: sp, z: Math.cos(this.yaw) * cp };
     const origin = { x: this.focus.x, y: lookY, z: this.focus.z };
-    const free = Math.max(1.6, this.occlusion(origin, dir, this.dist) - 0.35);
+    const free = Math.max(1.6, Math.min(this.occlusion(origin, dir, this.dist) - 0.35, this.terrainOcclusion(origin, dir, this.dist)));
     if (instant || free < this.occDist) this.occDist = free;
     else this.occDist = damp(this.occDist, free, 3, dt);
     const d = Math.min(this.dist, this.occDist);

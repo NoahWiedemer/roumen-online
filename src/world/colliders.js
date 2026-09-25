@@ -3,7 +3,8 @@ import { clamp } from '../core/utils.js';
 import { WORLD } from './layout.js';
 
 export class Colliders {
-  constructor() {
+  constructor(playable = WORLD.playable) {
+    this.playable = playable;  // hard clamp for entities (half extent of the walkable square)
     this.circles = [];
     this.boxes = [];
     this.cell = 8;
@@ -71,7 +72,7 @@ export class Colliders {
         }
       }
     }
-    const P = WORLD.playable;
+    const P = this.playable;
     return { x: clamp(x, -P, P), z: clamp(z, -P, P) };
   }
   blocked(x, z, r = 0.3) {
@@ -84,10 +85,11 @@ export class Colliders {
 export class NavGrid {
   constructor(terrain, colliders, cellSize = 1) {
     this.cs = cellSize;
-    this.n = Math.ceil(WORLD.size / cellSize);
-    this.half = WORLD.size / 2;
+    const size = terrain.size || WORLD.size;
+    this.n = Math.ceil(size / cellSize);
+    this.half = size / 2;
     this.walk = new Uint8Array(this.n * this.n);
-    const P = WORLD.playable;
+    const P = colliders.playable;
     for (let j = 0; j < this.n; j++) for (let i = 0; i < this.n; i++) {
       const x = -this.half + (i + 0.5) * cellSize, z = -this.half + (j + 0.5) * cellSize;
       let ok = Math.abs(x) < P && Math.abs(z) < P;

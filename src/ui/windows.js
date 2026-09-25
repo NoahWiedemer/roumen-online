@@ -100,7 +100,7 @@ export class Windows {
     w.el.classList.add('hidden');
     G.audio.play('close');
     this.hud.menuIcons[name]?.classList.remove('active');
-    if (name === 'npc') { this.npc = null; this.close('shop'); this.close('skillmaster'); }
+    if (name === 'npc') { this.npc = null; this.close('shop'); this.close('skillmaster'); this.showArt(null); }
     if (name === 'shop') this.shopNpc = null;
     this.hideTip();
     return true;
@@ -400,16 +400,12 @@ export class Windows {
     const draw = () => {
       if (!this.isOpen('map')) return;
       ctx.drawImage(this.hud.mapBase, 0, 0, S, S);
-      const k = S / WORLD.size;
-      const tp = (x, z) => [(x + WORLD.half) * k, (z + WORLD.half) * k];
+      const size = this.hud.mapSize || WORLD.size;
+      const k = S / size;
+      const tp = (x, z) => [(x + size / 2) * k, (z + size / 2) * k];
       ctx.font = '900 13px Nunito'; ctx.textAlign = 'center';
       const label = (x, z, t, col = '#fff') => { const [a, b] = tp(x, z); ctx.lineWidth = 3; ctx.strokeStyle = '#000a'; ctx.strokeText(t, a, b); ctx.fillStyle = col; ctx.fillText(t, a, b); };
-      label(-30, -20, 'ROUMEN', '#ffe070');
-      label(-10, 45, 'Harbour', '#fff');
-      label(-110, -85, 'Slimes', '#c8ffb0');
-      label(-40, -140, 'Mushrooms', '#ffd0a0');
-      label(95, -110, 'Imps', '#ffb0a0');
-      label(36, -142, 'Slime King', '#e0a0ff');
+      for (const [x, z, t, col] of (G.world && G.world.mapLabels) || []) label(x, z, t, col);
       for (const pt of G.portals || []) { const [a, b] = tp(pt.pos.x, pt.pos.z); ctx.fillStyle = '#4dff9a'; ctx.beginPath(); ctx.arc(a, b, 5, 0, 7); ctx.fill(); ctx.strokeStyle = '#063'; ctx.lineWidth = 2; ctx.stroke(); label(pt.pos.x, pt.pos.z + 9, pt.name, '#9fffc8'); }
       for (const n of G.npcs.list) { const [a, b] = tp(n.pos.x, n.pos.z); ctx.fillStyle = n.markerKind === 'available' ? '#ffd020' : n.markerKind === 'complete' ? '#60ff40' : '#fff'; ctx.beginPath(); ctx.arc(a, b, 3.5, 0, 7); ctx.fill(); }
       const p = G.player;
@@ -489,8 +485,33 @@ export class Windows {
   openNpc(npc) {
     this.npc = npc;
     this.npcPage = 'main';
+    const lines = npc.def.greetLines;
+    this.npcGreet = lines && lines.length ? lines[(Math.random() * lines.length) | 0] : npc.def.greet;
     this.open('npc');
     this.get('npc').title.textContent = `${npc.title} ${npc.name}`;
+    this.showArt(npc.def.art || null);
+  }
+  // large character illustration on the right side while talking
+  showArt(url) {
+    if (!this.artEl) {
+      this.artEl = el('img', '', document.getElementById('hud'));
+      this.artEl.id = 'npc-art';
+      this.artEl.alt = '';
+      this.artEl.draggable = false;
+    }
+    const a = this.artEl;
+    if (!url) { a.classList.remove('show'); return; }
+    // size in real screen pixels: the HUD may be CSS-zoomed on small windows, the art must still be cut off
+    // by the bottom edge (145% of the screen height, top at 4%), but never wider than 60% of the screen.
+    // It sits behind the HUD panels (z-index -1 inside #hud) and in front of the 3D view.
+    const z = G.uiScale || 1, H = window.innerHeight, W = window.innerWidth;
+    const aspect = a.naturalWidth && a.naturalHeight ? a.naturalWidth / a.naturalHeight : 0.75;
+    const h = Math.min(H * 1.45, (W * 0.6) / aspect);
+    a.style.height = (h / z) + 'px';
+    a.style.top = (H * 0.04 / z) + 'px';
+    a.style.right = (-H * 0.04 / z) + 'px';
+    const show = () => { a.classList.remove('show'); void a.offsetWidth; a.classList.add('show'); };
+    if (a.getAttribute('src') !== url) { a.onload = show; a.src = url; } else show();
   }
   render_npc(body) {
     const npc = this.npc;
@@ -512,7 +533,7 @@ export class Windows {
       const back = el('button', '', opts, 'Back'); back.onclick = () => { this.npcPage = 'main'; this.render('npc'); };
       return;
     }
-    el('div', 'dlg-text', body, esc(npc.def.greet));
+    el('div', 'dlg-text', body, esc(this.npcGreet || npc.def.greet));
     const opts = el('div', 'dlg-opts', body);
     for (const { id, q, state } of Q.forNpc(npc.id)) {
       const icon = state === 'available' ? '!' : state === 'complete' ? '?' : '…';

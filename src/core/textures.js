@@ -568,4 +568,4 @@ export function texRepeat(name, rx, ry = rx) {
 }
 
 // Canvas helper for UI or decals
-export { makeCanvas, toTexture };
+export { makeCanvas, toTexture, memo, normalFromHeight, voronoiField, paintPixels, hexToRgb, mix3 };

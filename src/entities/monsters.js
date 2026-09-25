@@ -46,13 +46,14 @@ export class Monster {
     this.groundY = 0;
   }
 
-  spawnAt(x, z) {
+  spawnAt(x, z, parent = G.scene) {
     this.pos.set(x, G.terrain.groundAt(x, z), z);
     this.home.copy(this.pos);
     this.groundY = this.pos.y;
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
-    G.scene.add(this.root);
+    this.parent = parent;
+    parent.add(this.root);
   }
 
   headPos() { return _v.set(this.pos.x, this.groundY + this.height + 0.25, this.pos.z).clone(); }
@@ -131,7 +132,7 @@ export class Monster {
       m.update(dt);
       if (m.dead || this.deathT > 3) {
         this.removed = true;
-        G.scene.remove(this.root);
+        this.root.parent?.remove(this.root);
         this.respawnT = this.def.respawn;
       }
       return;
@@ -246,13 +247,16 @@ export class Monster {
 }
 
 export class MonsterManager {
-  constructor() {
+  // zones: spawn zones of this world; parent: the world's root group
+  constructor(zones = SPAWN_ZONES, parent = null) {
     this.list = [];
+    this.zones = zones;
+    this.parent = parent;
     this.rng = mulberry32(4242);
     this.respawnQueue = [];
   }
   spawnAll() {
-    for (const z of SPAWN_ZONES) for (let i = 0; i < z.count; i++) this.spawnOne(z);
+    for (const z of this.zones) for (let i = 0; i < z.count; i++) this.spawnOne(z);
   }
   spawnOne(zone) {
     const rng = this.rng;
@@ -261,8 +265,8 @@ export class MonsterManager {
     for (let k = 0; k < 20; k++) {
       const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * zone.r * 0.8;
       const x = zone.x + Math.cos(a) * r, z = zone.z + Math.sin(a) * r;
-      if (G.nav.isWalkable(x, z)) { m.spawnAt(x, z); break; }
-      if (k === 19) m.spawnAt(zone.x, zone.z);
+      if (G.nav.isWalkable(x, z)) { m.spawnAt(x, z, this.parent || G.scene); break; }
+      if (k === 19) m.spawnAt(zone.x, zone.z, this.parent || G.scene);
     }
     this.list.push(m);
     return m;

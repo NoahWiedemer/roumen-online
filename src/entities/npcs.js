@@ -1,7 +1,9 @@
-// Town NPCs built from the humanoid generator, with idle behaviour and quest markers
+// NPCs built from the humanoid generator (or a skinned GLB model), with idle behaviour, optional wandering
+// with little showpiece poses, and quest markers. Each world has its own NpcManager.
 import * as THREE from 'three';
 import { createHumanoid } from './humanoid.js';
 import { Animator, P_IDLE, fullPose } from './anim.js';
+import { createRatmanRig } from './ratmanModel.js';
 import { NPCS } from '../game/data.js';
 import { G } from '../game/game.js';
 import { dampAngle } from '../core/utils.js';
@@ -38,30 +40,56 @@ const LOOKS = {
   bard: { outfit: 'robe', hair: 'long', hairColor: '#3a8a6a', skin: '#ffe0cc', clothColor: '#d8a030', armorColor: '#a07020', trimColor: '#ffffff', leatherColor: '#6a3a1a', hat: 'wizard', hairSeed: 31, headband: false, cape: true, capeColor: '#b03040', face: { irisColor: ['#ffe0a0', '#c08a2a', '#402a0a'], browColor: '#2a5a4a', smile: 0.03 }, pose: P_NPC },
 };
 
+// relaxed, slightly hunched stance for the rat-man (arms loose at the sides)
+const P_RAT = fullPose({
+  ...P_IDLE,
+  hips: [0, 0, 0], spine: [0.1, 0, 0], chest: [0.04, 0, 0], neck: [0.05, 0, 0], head: [-0.08, 0, 0],
+  armR: [0.05, 0, -0.16], elbowR: [-0.35, 0, 0], handR: [0, 0, 0],
+  armL: [0.08, 0, 0.16], elbowL: [-0.3, 0, 0], handL: [0, 0, 0],
+  legL: [-0.03, 0.05, 0.06], kneeL: [0.08, 0, 0], legR: [0.03, -0.05, -0.06], kneeR: [0.08, 0, 0],
+});
+const MODELS = { ratman: { create: createRatmanRig, pose: P_RAT } };
+const POSES = ['bow', 'flex', 'lookout', 'stretch', 'wave'];
+
 export class NPC {
-  constructor(def, spot) {
+  constructor(def, spot, env = {}) {
     this.def = def;
     this.id = def.id;
     this.name = def.name;
     this.title = def.title;
     this.isNpc = true;
-    const look = LOOKS[def.look] || LOOKS.merchant;
-    this.rig = createHumanoid({ ...look, name: def.id, weapon: look.weapon || null });
-    this.anim = new Animator(this.rig, { idlePose: look.pose || P_NPC });
+    const terrain = env.terrain || G.terrain;
+    const model = def.model && MODELS[def.model];
+    if (model) {
+      this.rig = model.create({ name: def.id });
+      this.anim = new Animator(this.rig, { idlePose: model.pose, gait: 'free' });
+      this.scale = 1;
+      this.height = this.rig.height;
+    } else {
+      const look = LOOKS[def.look] || LOOKS.merchant;
+      this.rig = createHumanoid({ ...look, name: def.id, weapon: look.weapon || null });
+      this.anim = new Animator(this.rig, { idlePose: look.pose || P_NPC });
+      this.scale = look.scale || 1;
+      this.height = 1.8 * this.scale;
+    }
     this.root = this.rig.root;
     this.radius = 0.45;
-    this.scale = look.scale || 1;
-    this.height = 1.8 * this.scale;
-    this.pos = new THREE.Vector3(spot.x, G.terrain.groundAt(spot.x, spot.z), spot.z);
+    this.pos = new THREE.Vector3(spot.x, terrain.groundAt(spot.x, spot.z), spot.z);
+    this.home = this.pos.clone();
     this.homeRot = spot.rotY || 0;
     this.rotY = this.homeRot;
     this.groundY = this.pos.y;
     this.waveCd = 3 + Math.random() * 5;
+    // wandering (def.wander = { r }): idle -> walk to a random nearby point / strike a pose -> idle ...
+    this.wander = def.wander || null;
+    this.state = 'idle';
+    this.stateT = 1 + Math.random() * 2;
+    this.goal = null;
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
     this.marker = null;
-    G.scene.add(this.root);
-    G.colliders.addCircle(spot.x, spot.z, 0.5);
+    (env.parent || G.scene).add(this.root);
+    if (!this.wander) (env.colliders || G.colliders).addCircle(spot.x, spot.z, 0.5);
     this.buildMarker();
   }
   headPos() { return new THREE.Vector3(this.pos.x, this.pos.y + this.height + 0.1, this.pos.z); }
@@ -104,29 +132,83 @@ export class NPC {
   update(dt) {
     const p = G.player;
     const d = Math.hypot(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
-    // face the player when close
-    if (d < 6) this.faceGoal = Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
-    else this.faceGoal = this.homeRot;
-    this.rotY = dampAngle(this.rotY, this.faceGoal, 4, dt);
-    this.waveCd -= dt;
-    if (d < 7 && this.waveCd <= 0 && !this.anim.busy) {
-      this.anim.play('wave');
-      this.waveCd = 12 + Math.random() * 10;
+    if (this.wander) this.updateWander(dt, d);
+    else {
+      // face the player when close
+      if (d < 6) this.faceGoal = Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
+      else this.faceGoal = this.homeRot;
+      this.rotY = dampAngle(this.rotY, this.faceGoal, 4, dt);
+      this.waveCd -= dt;
+      if (d < 7 && this.waveCd <= 0 && !this.anim.busy) {
+        this.anim.play('wave');
+        this.waveCd = 12 + Math.random() * 10;
+      }
     }
     if (this.marker.visible) this.marker.position.y = this.height + 0.85 + Math.sin(G.time * 3) * 0.08;
     this.root.visible = d < 120;
     if (d < 70) this.anim.update(dt, null);
+    this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
+  }
+
+  // stroll around home, pause, strike a pose now and then; stop and turn to the player when they come close
+  updateWander(dt, d) {
+    const p = G.player;
+    const talking = G.ui && G.ui.win && G.ui.win.npc === this && G.ui.win.isOpen('npc');
+    const WALK = 1.25;
+    let speed = 0;
+    if (talking || (d < 4.5 && !p.dead)) {
+      if (this.state === 'walk') { this.state = 'idle'; this.stateT = 2; }
+      this.faceGoal = Math.atan2(p.pos.x - this.pos.x, p.pos.z - this.pos.z);
+      if (this.state !== 'greeted' && d < 4.5 && !this.anim.busy && !talking) { this.anim.play('wave'); this.state = 'greeted'; }
+    } else {
+      if (this.state === 'greeted') { this.state = 'idle'; this.stateT = 1.5; }
+      this.stateT -= dt;
+      if (this.state === 'walk') {
+        const dx = this.goal.x - this.pos.x, dz = this.goal.z - this.pos.z, dist = Math.hypot(dx, dz);
+        if (dist < 0.3 || this.stateT <= 0) { this.state = 'idle'; this.stateT = 2 + Math.random() * 4; }
+        else {
+          const step = Math.min(dist, WALK * dt);
+          const nx = this.pos.x + (dx / dist) * step, nz = this.pos.z + (dz / dist) * step;
+          if (G.nav && !G.nav.isWalkable(nx, nz)) { this.state = 'idle'; this.stateT = 1; }
+          else { this.pos.x = nx; this.pos.z = nz; speed = WALK; this.faceGoal = Math.atan2(dx, dz); }
+        }
+      } else if (this.state === 'pose') {
+        if (!this.anim.busy) { this.state = 'idle'; this.stateT = 2 + Math.random() * 3; }
+      } else if (this.stateT <= 0 && !this.anim.busy) {
+        if (Math.random() < 0.3) {
+          this.anim.play(POSES[(Math.random() * POSES.length) | 0]);
+          this.state = 'pose';
+        } else {
+          for (let k = 0; k < 8; k++) {
+            const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * this.wander.r;
+            const gx = this.home.x + Math.cos(a) * r, gz = this.home.z + Math.sin(a) * r;
+            if (Math.hypot(gx - this.pos.x, gz - this.pos.z) < 2.5 || (G.nav && !G.nav.isWalkable(gx, gz))) continue;
+            this.goal = { x: gx, z: gz };
+            this.state = 'walk';
+            this.stateT = 12;
+            break;
+          }
+          if (this.state !== 'walk') this.stateT = 1;
+        }
+      }
+    }
+    this.pos.y = G.terrain.groundAt(this.pos.x, this.pos.z);
+    this.groundY = this.pos.y;
+    if (this.faceGoal !== undefined) this.rotY = dampAngle(this.rotY, this.faceGoal, speed > 0 ? 6 : 4, dt);
+    this.anim.speed += ((speed > 0 ? 0.36 : 0) - this.anim.speed) * (1 - Math.exp(-8 * dt));
+    this.anim.moveDir = 1;
   }
 }
 
 export class NpcManager {
-  constructor() {
+  // defs: NPC definitions for this world; env: { parent, terrain, colliders }
+  constructor(defs = NPCS.filter((n) => !n.world || n.world === 'roumen'), env = {}) {
     this.list = [];
-    for (const def of NPCS) {
-      const pt = NPC_POINTS[def.spot];
+    for (const def of defs) {
+      const pt = def.pos || NPC_POINTS[def.spot];
       if (!pt) continue;
-      this.list.push(new NPC(def, { x: pt[0], z: pt[1], rotY: def.rot || 0 }));
+      this.list.push(new NPC(def, { x: pt[0], z: pt[1], rotY: def.rot || 0 }, env));
     }
   }
   get(id) { return this.list.find((n) => n.id === id); }

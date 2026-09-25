@@ -215,6 +215,19 @@ export const NPCS = [
     greet: 'My ship isn\'t ready to sail yet. Come back when the harbour is open for voyages!' },
   { id: 'sailor', spot: 14, rot: 3.6, name: 'Finn', title: 'Sailor', look: 'merchant', roles: ['talk'],
     greet: 'Arr, the sea breeze on this island is the best in all of Roumen.' },
+
+  // ---- Cyclone Hill / Forest of Mist (world: 'cyclone'; pos = world x,z instead of a Roumen map spot)
+  { id: 'sir_ratman', world: 'cyclone', pos: [6, 146], rot: Math.PI, name: 'Sir Ratman', title: 'Rat Knight', model: 'ratman', roles: ['quest'],
+    wander: { r: 9 }, art: '/art/sir_ratman.png',
+    greet: 'Hm? A traveller in the Forest of Mist? How delightfully unexpected.',
+    greetLines: [
+      'Hm? A traveller in the Forest of Mist? How delightfully unexpected.',
+      'Mind the mist, friend. It has a habit of swallowing the careless.',
+      'They call me Sir Ratman. The "Sir" is self-appointed, but it stuck.',
+      'Up on Cyclone Hill the wind never sleeps. Neither do the things that live there.',
+      'I shall have tasks for brave souls soon. Until then, enjoy the waterfalls.',
+      'This pickaxe? Merely a gentleman\'s walking stick. Mostly.',
+    ] },
 ];
 
 // ------------------------------------------------------------------ quests

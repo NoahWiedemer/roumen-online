@@ -36,6 +36,7 @@ if (q.get('terrain') === '1') {
 const sky = new Sky(scene, engine.sunDir);
 
 const ctx = { THREE, engine, scene, camera, controls, terrain, q, onUpdate: (fn) => updaters.push(fn), info: (t) => (document.getElementById('info').textContent = t) };
+window.__viewer = ctx; // debug handle
 const name = q.get('scene');
 if (name) {
   try {

@@ -111,6 +111,7 @@ export class LootManager {
     l.glow.material.dispose();
     this.list.splice(this.list.indexOf(l), 1);
   }
+  clear() { for (const l of [...this.list]) this.remove(l); }
 
   update(dt) {
     for (let i = this.list.length - 1; i >= 0; i--) {

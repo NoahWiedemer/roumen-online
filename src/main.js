@@ -9,19 +9,23 @@ import { Terrain } from './world/terrain.js';
 import { Sky } from './world/sky.js';
 import { createSea } from './world/sea.js';
 import { createPortal } from './world/portal.js';
-import { PORTALS } from './world/layout.js';
+import { PORTALS, SPAWN_ZONES, TOWN, MAP_LABELS, areaNameAt } from './world/layout.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as MonsterModels from './entities/monsterModels.js';
 import { createWorldContext } from './world/worldctx.js';
 import { buildVegetation } from './world/vegetation.js';
 import { NavGrid } from './world/colliders.js';
+import { registerWorld, registerBuilder, captureAtmosphere, restoreAtmosphere, getWorld, enterWorld, travel, addPortalBlockers } from './world/worlds.js';
 import { Effects } from './entities/effects.js';
 import { Player } from './entities/player.js';
+import { preloadPlayerModel } from './entities/playerModel.js';
+import { preloadRatmanModel } from './entities/ratmanModel.js';
 import { MonsterManager } from './entities/monsters.js';
 import { NpcManager } from './entities/npcs.js';
 import { LootManager } from './entities/loot.js';
 import { createMiniHouse } from './entities/minihouse.js';
 import { QuestLog } from './game/quests.js';
+import { NPCS } from './game/data.js';
 import { HUD, SLOT_CODES } from './ui/hud.js';
 
 const loadFill = document.getElementById('loadFill');
@@ -72,41 +76,26 @@ async function init() {
   const assets = {};
   try { assets.house = (await new GLTFLoader().loadAsync('/models/house.glb')).scene; } catch (e) { console.warn('house model', e); }
   if (MonsterModels.preloadMonsterAssets) { try { await MonsterModels.preloadMonsterAssets(); } catch (e) { console.warn('monster assets', e); } }
+  try { await preloadPlayerModel(); } catch (e) { console.warn('player model (falling back to the procedural fighter)', e); }
 
-  await step(12, 'Shaping the land…');
-  const terrain = new Terrain();
-  G.terrain = terrain;
-  engine.scene.add(terrain.mesh);
-  const sky = new Sky(engine.scene, engine.sunDir);
-  const sea = createSea(terrain, engine.sunDir);
-  engine.scene.add(sea.mesh);
-
-  await step(28, 'Building Roumen…');
-  const ctx = createWorldContext(engine.scene, terrain);
-  ctx.assets = assets;
-  G.colliders = ctx.colliders;
-  let town;
-  try { const { buildTown } = await import('./world/town.js'); town = buildTown(ctx); }
-  catch (e) { console.error('town build failed', e); town = { update() {}, npcSpots: {} }; }
-  // portals (sealed for now)
-  G.portals = PORTALS.map((p) => {
-    const portal = createPortal({ ...p, y: terrain.groundAt(p.x, p.z) });
-    engine.scene.add(portal.group);
-    const c = Math.cos(p.rotY), s = Math.sin(p.rotY);
-    for (const sx of [-1, 1]) ctx.colliders.addCircle(p.x + c * sx * 2.35, p.z - s * sx * 2.35, 0.6);
-    ctx.addNoScatter(p.x, p.z, 4);
-    ctx.minimap.addCircle(p.x, p.z, 2.2, '#4dff9a');
-    return portal;
+  const roumen = await buildRoumen(engine, assets);
+  registerWorld(roumen);
+  // other worlds are built on their first visit (see world/worlds.js)
+  registerBuilder('cyclone', async (progress) => {
+    await progress(2, 'Summoning the locals…');
+    try { await preloadRatmanModel(); } catch (e) { console.warn('ratman model', e); }
+    const { buildCycloneWorld } = await import('./world/cyclone/index.js');
+    const w = await buildCycloneWorld({ engine, progress });
+    w.root.visible = false;
+    engine.scene.add(w.root);
+    w.npcs = new NpcManager(NPCS.filter((n) => n.world === 'cyclone'), { parent: w.root, terrain: w.terrain, colliders: w.colliders });
+    w.monsters = new MonsterManager([], w.root);
+    return w;
   });
-
-  await step(48, 'Growing trees and flowers…');
-  buildVegetation(ctx);
-
-  await step(60, 'Merging geometry…');
-  ctx.batcher.build(engine.scene);
-
-  await step(68, 'Mapping paths…');
-  G.nav = new NavGrid(terrain, ctx.colliders, 1);
+  G.travel = travel;
+  G.usePortal = (portal) => { if (portal.dest) travel(portal.dest); };
+  G.world = roumen;
+  G.terrain = roumen.terrain; G.colliders = roumen.colliders; G.nav = roumen.nav; G.portals = roumen.portals;
 
   await step(78, 'Waking up the townsfolk…');
   G.fx = new Effects(engine.scene);
@@ -116,29 +105,44 @@ async function init() {
   const loaded = player.load();
   G.player = player;
   player.attach(engine.scene);
-  if (!G.nav.isWalkable(player.pos.x, player.pos.z)) { const w = G.nav.nearestWalkable(player.pos.x, player.pos.z, 20); if (w) player.pos.set(w[0], 0, w[1]); }
-  player.pos.y = terrain.groundAt(player.pos.x, player.pos.z);
-  G.npcs = new NpcManager();
+  const startWorld = loaded && player._savedWorld && player._savedWorld !== 'roumen' ? player._savedWorld : 'roumen';
+  if (startWorld === 'roumen') {
+    if (!G.nav.isWalkable(player.pos.x, player.pos.z)) { const w = G.nav.nearestWalkable(player.pos.x, player.pos.z, 20); if (w) player.pos.set(w[0], 0, w[1]); }
+    player.pos.y = roumen.terrain.groundAt(player.pos.x, player.pos.z);
+  }
+  roumen.npcs = new NpcManager(undefined, { parent: roumen.root });
+  G.npcs = roumen.npcs;
   if (player._savedQuests) G.quests.load(player._savedQuests);
 
   await step(88, 'Spawning monsters…');
-  G.monsters = new MonsterManager();
+  roumen.monsters = new MonsterManager(SPAWN_ZONES, roumen.root);
+  G.monsters = roumen.monsters;
   G.monsters.spawnAll();
   try { MonsterModels.warmupMonsters && MonsterModels.warmupMonsters(engine.renderer, engine.camera, engine.scene); } catch (e) { console.warn(e); }
 
   await step(94, 'Drawing the map…');
   G.input = new Input(canvas);
-  G.cam = new FollowCamera(engine.camera, terrain);
-  G.cam.setBlockers(ctx.colliders, terrain);
+  G.cam = new FollowCamera(engine.camera, roumen.terrain);
+  G.cam.setBlockers(roumen.colliders, roumen.terrain);
+  addPortalBlockers(G.cam, roumen.portals);
   G.cam.yaw = player.rotY + Math.PI;
   G.cam.snap(player.pos);
   const hud = new HUD();
   G.ui = hud;
-  hud.buildMinimapBase(ctx.minimap);
+  hud.setWorld(roumen);
   hud.renderSkillbars();
   hud.renderBuffs();
   G.quests.refresh();
   player.recalc();
+  // a save made inside another world continues there
+  if (startWorld !== 'roumen') {
+    try {
+      const at = { x: player.pos.x, z: player.pos.z, rotY: player.rotY };
+      const w = await getWorld(startWorld, (pct, text) => step(94 + pct * 0.05, text));
+      if (!w.nav.isWalkable(at.x, at.z)) Object.assign(at, w.spawn);
+      enterWorld(w, at);
+    } catch (e) { console.error('could not restore world', startWorld, e); enterWorld(roumen); }
+  }
 
   // warm up: compile shaders by rendering once
   engine.setShadowFocus(player.pos);
@@ -153,7 +157,7 @@ async function init() {
       G.msg('Welcome to Roumen! Talk to Town Chief Oswin on the plaza (look for the ! marker).', 'quest');
       G.msg('Left-click to move · double-click monsters to attack · right-drag to rotate the camera.', 'sys');
     }
-    hud.centerMsg('Roumen', 3);
+    hud.centerMsg(G.world.areaNameAt(player.pos.x, player.pos.z), 3);
   });
 
   // ------------------------------------------------------------------ main loop
@@ -169,13 +173,9 @@ async function init() {
     G.monsters.update(dt);
     G.npcs.update(dt);
     G.loot.update(dt);
-    for (const f of ctx.updaters) f(dt, G.time);
-    sea.update(G.time);
-    for (const p of G.portals) p.update(dt, G.time, G.fx);
-    if (town.update) town.update(dt, G.time);
     G.cam.update(dt, player.pos, G.input);
     engine.setShadowFocus(player.pos);
-    sky.update(dt, engine.camera.position);
+    G.world.update(dt, G.time, engine.camera, player.pos, G.fx);
     G.fx.update(dt, engine.camera);
     hud.update(dt);
     engine.render();
@@ -193,6 +193,59 @@ async function init() {
   window.addEventListener('resize', fitHud);
   fitHud();
   window.G = G; // debug handle
+}
+
+// ------------------------------------------------------------------ Roumen (the start world)
+async function buildRoumen(engine, assets) {
+  await step(12, 'Shaping the land…');
+  const root = new THREE.Group();
+  root.name = 'world:roumen';
+  engine.scene.add(root);
+  const terrain = new Terrain();
+  root.add(terrain.mesh);
+  const sky = new Sky(root, engine.sunDir);
+  const sea = createSea(terrain, engine.sunDir);
+  root.add(sea.mesh);
+
+  await step(28, 'Building Roumen…');
+  const ctx = createWorldContext(root, terrain);
+  ctx.assets = assets;
+  let town;
+  try { const { buildTown } = await import('./world/town.js'); town = buildTown(ctx); }
+  catch (e) { console.error('town build failed', e); town = { update() {}, npcSpots: {} }; }
+  // portals: dest = world id to travel to; the others are sealed for now
+  const portals = PORTALS.map((p) => {
+    const portal = createPortal({ ...p, y: terrain.groundAt(p.x, p.z) });
+    portal.dest = p.dest || null;
+    root.add(portal.group);
+    const c = Math.cos(p.rotY), s = Math.sin(p.rotY);
+    for (const sx of [-1, 1]) ctx.colliders.addCircle(p.x + c * sx * 2.35, p.z - s * sx * 2.35, 0.6);
+    ctx.addNoScatter(p.x, p.z, 4);
+    ctx.minimap.addCircle(p.x, p.z, 2.2, '#4dff9a');
+    return portal;
+  });
+
+  await step(48, 'Growing trees and flowers…');
+  buildVegetation(ctx);
+
+  await step(60, 'Merging geometry…');
+  ctx.batcher.build(root);
+
+  await step(68, 'Mapping paths…');
+  const nav = new NavGrid(terrain, ctx.colliders, 1);
+  const atmosphere = captureAtmosphere(engine);
+  return {
+    id: 'roumen', name: 'Roumen', root, terrain, colliders: ctx.colliders, nav, minimap: ctx.minimap, portals,
+    spawn: { x: TOWN.spawn.x, z: TOWN.spawn.z, rotY: -0.52 }, areaNameAt, mapLabels: MAP_LABELS,
+    activate(eng) { restoreAtmosphere(eng, atmosphere); },
+    update(dt, t, camera, pos, fx) {
+      for (const f of ctx.updaters) f(dt, t);
+      sea.update(t);
+      for (const p of portals) p.update(dt, t, fx);
+      if (town.update) town.update(dt, t);
+      sky.update(dt, camera.position);
+    },
+  };
 }
 
 function showStart(loaded, onStart) {
@@ -213,8 +266,9 @@ function showStart(loaded, onStart) {
   const q = new URLSearchParams(location.search);
   if (q.has('autostart')) {
     document.getElementById('loading').style.transition = 'none';
-    setTimeout(() => {
+    setTimeout(async () => {
       go();
+      if (q.get('map') && q.get('map') !== G.world.id) await G.travel(q.get('map'));
       // debug camera / position params
       if (q.get('pos')) { const [x, z] = q.get('pos').split(',').map(Number); G.player.teleport(x, z); }
       if (q.get('rot')) G.player.rotY = Number(q.get('rot'));
@@ -299,6 +353,8 @@ function handleInput(dt) {
     }
     if (ent && ent.isLoot) { p.pending = { kind: 'loot', loot: ent }; p.moveTo(ent.pos.x, ent.pos.z); continue; }
     if (ent && ent.isPortal) {
+      p.exitHouse && p.exitHouse();
+      if (ent.dest) { p.autoAttack = false; p.pending = { kind: 'portal', portal: ent }; p.path = null; continue; }
       const d = Math.hypot(ent.pos.x - p.pos.x, ent.pos.z - p.pos.z);
       if (d > 6) { p.moveTo(ent.pos.x + Math.sin(ent.group.rotation.y) * 3.5, ent.pos.z + Math.cos(ent.group.rotation.y) * 3.5); }
       else { G.msg(`The way to ${ent.name} is sealed for now. (Coming soon)`, 'warn'); G.audio.play('teleport'); }

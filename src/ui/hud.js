@@ -197,12 +197,12 @@ export class HUD {
   // ---------------------------------------------------------------- portraits
   refreshPortrait() {
     const p = G.player;
-    const url = renderPortrait(G.engine.renderer, null, p.root, 1.32, 0.95, { env: G.scene.environment });
+    const url = renderPortrait(G.engine.renderer, null, p.root, p.rig.portraitY || 1.32, p.rig.portraitDist || 0.95, { env: G.scene.environment });
     this.pfFace.src = url;
     this.win.setPortrait(url);
   }
   portraitFor(t) {
-    if (t.isNpc) return renderPortrait(G.engine.renderer, 'npc:' + t.id, t.root, 1.34 * (t.scale || 1), 0.95 * (t.scale || 1), { env: G.scene.environment, yaw: 0 });
+    if (t.isNpc) return renderPortrait(G.engine.renderer, 'npc:' + t.id, t.root, t.rig.portraitY || 1.34 * (t.scale || 1), t.rig.portraitDist || 0.95 * (t.scale || 1), { env: G.scene.environment, yaw: 0 });
     const key = 'mon:' + t.type;
     const h = t.model.headY || t.height * 0.6;
     return renderPortrait(G.engine.renderer, key, t.root, h, Math.max(0.8, t.height * 1.1), { yaw: 0.25, env: G.scene.environment });
@@ -349,35 +349,49 @@ export class HUD {
   }
 
   // ---------------------------------------------------------------- minimap
-  buildMinimapBase(minimapShapes) {
-    const S = 1024, T = G.terrain;
+  // switch the minimap / area names to a world (the painted base map is built once per world and cached on it)
+  setWorld(world) {
+    if (!world.mapBase) world.mapBase = this.buildMinimapBase(world.minimap, world.terrain);
+    this.mapBase = world.mapBase;
+    this.mapSize = world.terrain.size;
+    this.areaNameAt = world.areaNameAt || areaNameAt;
+    if (G.player) this.mmTitle.textContent = this.areaNameAt(G.player.pos.x, G.player.pos.z);
+    this.win.refresh('map');
+  }
+  buildMinimapBase(minimapShapes, T = G.terrain) {
+    const S = 1024, SIZE = T.size || WORLD.size, half = SIZE / 2;
     const c = document.createElement('canvas'); c.width = c.height = S;
     const ctx = c.getContext('2d');
     const R = 512;
     const small = document.createElement('canvas'); small.width = small.height = R;
     const sctx = small.getContext('2d');
     const img = sctx.createImageData(R, R);
-    const splat = T.splatCanvas.getContext('2d').getImageData(0, 0, T.splatCanvas.width, T.splatCanvas.height).data;
-    const sw = T.splatCanvas.width;
-    const half = WORLD.half;
+    // base colour: worlds may provide their own (minimapColor), otherwise Roumen's splat channels
+    let colorAt = T.minimapColor ? (wx, wz) => T.minimapColor(wx, wz) : null;
+    if (!colorAt) {
+      const splat = T.splatCanvas.getContext('2d').getImageData(0, 0, T.splatCanvas.width, T.splatCanvas.height).data;
+      const sw = T.splatCanvas.width;
+      colorAt = (wx, wz) => {
+        const sx = Math.floor((wx + half) / SIZE * sw), sy = Math.floor((wz + half) / SIZE * sw);
+        const si = (sy * sw + sx) * 4;
+        const dirt = splat[si] / 255, cob = splat[si + 1] / 255, plaza = splat[si + 2] / 255, rock = 1 - splat[si + 3] / 255;
+        let col = T.zoneAt(wx, wz) === 4 ? [70, 120, 50] : [118, 176, 74];
+        col = mix(col, [205, 170, 115], dirt);
+        col = mix(col, [238, 206, 170], plaza);
+        col = mix(col, [190, 196, 205], cob);
+        return mix(col, [150, 140, 120], rock * 0.7);
+      };
+    }
     for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
-      const wx = -half + (x + 0.5) / R * WORLD.size, wz = -half + (y + 0.5) / R * WORLD.size;
-      const sx = Math.floor((x + 0.5) / R * sw), sy = Math.floor((y + 0.5) / R * sw);
-      const si = (sy * sw + sx) * 4;
-      const dirt = splat[si] / 255, cob = splat[si + 1] / 255, plaza = splat[si + 2] / 255, rock = 1 - splat[si + 3] / 255;
-      const zn = T.zoneAt(wx, wz);
-      let col = zn === 4 ? [70, 120, 50] : [118, 176, 74];
-      col = mix(col, [205, 170, 115], dirt);
-      col = mix(col, [238, 206, 170], plaza);
-      col = mix(col, [190, 196, 205], cob);
-      col = mix(col, [150, 140, 120], rock * 0.7);
+      const wx = -half + (x + 0.5) / R * SIZE, wz = -half + (y + 0.5) / R * SIZE;
+      const col = colorAt(wx, wz);
       // hillshade
       const n = T.normalAt(wx, wz);
       const shade = 0.72 + Math.max(0, n.x * -0.5 + n.y * 0.6 + n.z * -0.35) * 0.45;
       const h = T.heightAt(wx, wz);
-      const hl = 0.9 + Math.min(0.25, h * 0.006);
+      const hl = 0.9 + Math.max(-0.2, Math.min(0.25, h * 0.006));
       let rgb = col.map((v) => v * shade * hl);
-      if (T.isWater(wx, wz)) { const dp = Math.min(1, -T.heightAt(wx, wz) / 6); rgb = mix([110, 200, 235], [40, 110, 200], dp); }
+      if (T.isWater(wx, wz)) { const dp = Math.min(1, Math.max(0, -h / 6)); rgb = mix([110, 200, 235], [40, 110, 200], dp); }
       const i = (y * R + x) * 4;
       img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2]; img.data[i + 3] = 255;
     }
@@ -385,7 +399,7 @@ export class HUD {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(small, 0, 0, S, S);
     // footprints
-    const k = S / WORLD.size;
+    const k = S / SIZE;
     for (const sh of minimapShapes.shapes) {
       ctx.save();
       ctx.translate((sh.x + half) * k, (sh.z + half) * k);
@@ -401,7 +415,6 @@ export class HUD {
       }
       ctx.restore();
     }
-    this.mapBase = c;
     return c;
   }
   mmScale() { return 2.2 * this.mmZoom; } // canvas px per metre
@@ -410,9 +423,10 @@ export class HUD {
     const ctx = this.mmCtx, W = this.mmCanvas.width, H = this.mmCanvas.height;
     const p = G.player.pos;
     const s = this.mmScale();
-    const k = this.mapBase.width / WORLD.size;
+    const size = this.mapSize || WORLD.size;
+    const k = this.mapBase.width / size;
     const srcW = W / s * k, srcH = H / s * k;
-    const sx = (p.x + WORLD.half) * k - srcW / 2, sy = (p.z + WORLD.half) * k - srcH / 2;
+    const sx = (p.x + size / 2) * k - srcW / 2, sy = (p.z + size / 2) * k - srcH / 2;
     ctx.fillStyle = '#3a5a2a';
     ctx.fillRect(0, 0, W, H);
     ctx.drawImage(this.mapBase, sx, sy, srcW, srcH, 0, 0, W, H);
@@ -499,7 +513,7 @@ export class HUD {
     if (this._mmT > 0.05) {
       this._mmT = 0;
       this.drawMinimap();
-      const area = areaNameAt(p.pos.x, p.pos.z);
+      const area = (this.areaNameAt || areaNameAt)(p.pos.x, p.pos.z);
       if (this.mmTitle.textContent !== area) {
         const prev = this.mmTitle.textContent;
         this.mmTitle.textContent = area;

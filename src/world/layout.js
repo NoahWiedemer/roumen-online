@@ -76,8 +76,9 @@ export const RAMPS = [
 export const LOOP_PATH = [[-115.0, -64.4], [-119.6, -82.8], [-121.4, -99.4], [-115.0, -115.0], [-101.2, -126.0], [-82.8, -131.6], [-55.2, -134.3], [-27.6, -136.2], [0.0, -134.3], [27.6, -135.2], [55.2, -134.3], [78.2, -130.6], [92.0, -119.6], [99.4, -105.8], [104.0, -87.4], [107.6, -69.0], [106.7, -50.6], [104.9, -32.2], [104.0, -18.4]];
 export const LOOP_PATH_WIDTH = 4.5;
 
-// ------------------------------------------------------------------ portals (not functional yet)
+// ------------------------------------------------------------------ portals (dest = world id; the others are sealed for now)
 export const PORTALS = [
+  { id: 'cyclone_hill', name: 'Cyclone Hill', x: -6, z: -121, rotY: 0, dest: 'cyclone' },
   { id: 'forest_of_tides', name: 'Forest of Tides', x: -125.3, z: -127.0, rotY: 0.75 },
   { id: 'sand_beach', name: 'Sand Beach', x: 111.3, z: -73.9, rotY: -1.57 },
   { id: 'teleport_gate', name: 'Teleport Gate', x: -93.8, z: 22.4, rotY: 1.57 },
@@ -107,6 +108,12 @@ export const SPAWN_ZONES = [
   { id: 'imp_east', type: 'imp', x: 104.9, z: -62.0, r: 12, count: 6, lv: [6, 7] },
   { id: 'imp_glade', type: 'imp', x: 14.7, z: -82.8, r: 8, count: 3, lv: [6, 7] },
   { id: 'king_slime', type: 'kingslime', x: 36.0, z: -133.0, r: 6, count: 1, lv: [9, 9] },
+];
+
+// labels for the area map window
+export const MAP_LABELS = [
+  [-30, -20, 'ROUMEN', '#ffe070'], [-10, 45, 'Harbour', '#fff'], [-110, -85, 'Slimes', '#c8ffb0'],
+  [-40, -140, 'Mushrooms', '#ffd0a0'], [95, -110, 'Imps', '#ffb0a0'], [36, -142, 'Slime King', '#e0a0ff'],
 ];
 
 export function areaNameAt(x, z) {
