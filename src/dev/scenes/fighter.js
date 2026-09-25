@@ -1,9 +1,11 @@
-// Fighter model preview: ?scene=fighter&anim=attack1&time=0.25&speed=1&battle=1&sit=0
+// Fighter model preview: ?scene=fighter&anim=attack1&time=0.25&speed=1&battle=1&sit=0 (&model=0 = procedural chibi)
 import * as THREE from 'three';
 import { createFighter } from '../../entities/fighter.js';
+import { preloadPlayerModel } from '../../entities/playerModel.js';
 
-export default function (ctx) {
+export default async function (ctx) {
   const { scene, q } = ctx;
+  if (q.get('model') !== '0') await preloadPlayerModel();
   const f = createFighter();
   scene.add(f.root);
   const others = [];

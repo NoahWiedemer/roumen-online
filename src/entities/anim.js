@@ -284,6 +284,50 @@ export const CLIPS = {
       { t: 1.6, ...P_IDLE },
     ],
   }),
+  // ---- idle showpieces for wandering NPCs (Sir Ratman)
+  // courtly bow: right hand to the chest, left arm swept back
+  bow: new Clip('bow', {
+    duration: 2.2, base: P_IDLE,
+    keys: [
+      { t: 0, ...P_IDLE },
+      { t: 0.45, e: 'out', armR: [-0.9, 0.5, 0.3], elbowR: [-1.9, 0, 0], armL: [0.5, 0, 0.35], elbowL: [-0.2, 0, 0], legR: [0.2, 0, -0.05], kneeR: [0.25, 0, 0] },
+      { t: 0.9, e: 'inOut', pos: [0, -0.04, -0.03], spine: [0.45, 0, 0], chest: [0.25, 0, 0], head: [0.3, 0, 0], armR: [-0.95, 0.5, 0.3], elbowR: [-1.95, 0, 0], armL: [0.75, 0, 0.3], elbowL: [-0.15, 0, 0], legL: [-0.15, 0, 0.05], kneeL: [0.2, 0, 0], legR: [0.25, 0, -0.05], kneeR: [0.3, 0, 0] },
+      { t: 1.5, e: 'linear', pos: [0, -0.04, -0.03], spine: [0.47, 0, 0], chest: [0.26, 0, 0], head: [0.32, 0, 0], armR: [-0.95, 0.5, 0.3], elbowR: [-1.95, 0, 0], armL: [0.78, 0, 0.3] },
+      { t: 2.2, e: 'inOut', ...P_IDLE },
+    ],
+  }),
+  // double-biceps flex
+  flex: new Clip('flex', {
+    duration: 2.6, base: P_IDLE,
+    keys: [
+      { t: 0, ...P_IDLE },
+      { t: 0.4, e: 'outBack', pos: [0, -0.03, 0], spine: [-0.08, 0, 0], chest: [-0.12, 0, 0], head: [-0.15, 0, 0], armL: [0, 0, 1.45], elbowL: [0, 0, 1.75], armR: [0, 0, -1.45], elbowR: [0, 0, -1.75], legL: [0, 0, 0.18], legR: [0, 0, -0.18] },
+      { t: 1.1, e: 'inOut', pos: [0, -0.04, 0], spine: [-0.06, 0.25, 0], chest: [-0.12, 0.15, 0], head: [-0.12, -0.3, 0], armL: [0, 0, 1.5], elbowL: [0, 0, 1.85], armR: [0, 0, -1.5], elbowR: [0, 0, -1.85], legL: [0, 0, 0.18], legR: [0, 0, -0.18] },
+      { t: 1.9, e: 'inOut', pos: [0, -0.04, 0], spine: [-0.06, -0.25, 0], chest: [-0.12, -0.15, 0], head: [-0.12, 0.3, 0], armL: [0, 0, 1.5], elbowL: [0, 0, 1.9], armR: [0, 0, -1.5], elbowR: [0, 0, -1.9], legL: [0, 0, 0.18], legR: [0, 0, -0.18] },
+      { t: 2.6, e: 'inOut', ...P_IDLE },
+    ],
+  }),
+  // shade the eyes and scan the horizon
+  lookout: new Clip('lookout', {
+    duration: 3.2, base: P_IDLE,
+    keys: [
+      { t: 0, ...P_IDLE },
+      { t: 0.45, e: 'out', armL: [-2.2, 0, 0.15], elbowL: [-1.85, 0, 0], handL: [0.3, 0, 0], head: [-0.18, 0.55, 0], neck: [0, 0.2, 0], spine: [0, 0.15, 0] },
+      { t: 1.4, e: 'inOut', armL: [-2.2, 0, 0.15], elbowL: [-1.85, 0, 0], handL: [0.3, 0, 0], head: [-0.2, -0.55, 0], neck: [0, -0.2, 0], spine: [0, -0.15, 0] },
+      { t: 2.4, e: 'inOut', armL: [-2.2, 0, 0.15], elbowL: [-1.85, 0, 0], handL: [0.3, 0, 0], head: [-0.15, 0.1, 0], neck: [0, 0.05, 0], spine: [0, 0, 0] },
+      { t: 3.2, e: 'inOut', ...P_IDLE },
+    ],
+  }),
+  // big stretch with both arms above the head
+  stretch: new Clip('stretch', {
+    duration: 2.4, base: P_IDLE,
+    keys: [
+      { t: 0, ...P_IDLE },
+      { t: 0.6, e: 'out', root: [0, 0.04, 0], spine: [-0.22, 0, 0], chest: [-0.15, 0, 0], head: [-0.35, 0, 0], armL: [-2.95, 0, 0.25], elbowL: [-0.4, 0, 0], armR: [-2.95, 0, -0.25], elbowR: [-0.4, 0, 0] },
+      { t: 1.4, e: 'inOut', root: [0, 0.05, 0], spine: [-0.24, 0, 0.12], chest: [-0.16, 0, 0.1], head: [-0.3, 0, 0.1], armL: [-3.0, 0, 0.3], elbowL: [-0.3, 0, 0], armR: [-3.0, 0, -0.2], elbowR: [-0.3, 0, 0] },
+      { t: 2.4, e: 'inOut', ...P_IDLE },
+    ],
+  }),
   // death falls into P_DEAD and stays
   death: new Clip('death', {
     duration: 1.1, base: B, expression: 'hurt',
@@ -299,9 +343,10 @@ export const CLIPS = {
 
 // ------------------------------------------------------------------ animator
 export class Animator {
-  constructor(rig, { idlePose = P_IDLE } = {}) {
+  constructor(rig, { idlePose = P_IDLE, gait = 'sword' } = {}) {
     this.rig = rig;
     this.J = rig.joints;
+    this.gait = gait;       // 'sword' (blade trails behind while running) | 'free' (both arms swing)
     this.idlePose = fullPose(idlePose);
     this.t = 0;
     this.speed = 0;         // 0..1 locomotion blend (running)
@@ -392,6 +437,11 @@ export class Animator {
         // sword arm: blade trailing behind, small counter swing
         armR: [0.62 - sw * 0.18, 0, -0.36], elbowR: [-0.55 - Math.max(0, sw) * 0.15, 0, 0], handR: [2.15, 0, -0.3],
       };
+      if (this.gait === 'free') {
+        // unarmed walkers swing both arms in opposition to the legs
+        run.armR = [-sw * 0.85 * dir, -0.1, -0.28]; run.elbowR = [-1.05 - Math.max(0, sw) * 0.45, 0, 0]; run.handR = [0.1, 0, 0];
+        run.armL[1] = 0.1;
+      }
       if (this.runOverride) for (const k of ['armR', 'elbowR', 'handR']) if (this.runOverride[k]) run[k] = this.runOverride[k];
       const w = Math.min(1, s * 1.8);
       for (const k of Object.keys(run)) {
@@ -450,6 +500,7 @@ export class Animator {
     if (!(a && !a.done)) this.rootDelta.set(0, 0, 0);
     this.rootOffset.set(0, pose.root[1], 0);
     this.rig.body.position.copy(this.rootOffset);
+    if (this.rig.afterPose) this.rig.afterPose(); // skinned rigs retarget the joint pose onto their bones
 
     // facial expression + blinking
     if (this.dead) expr = 'hurt';

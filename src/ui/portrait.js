@@ -1,5 +1,6 @@
 // Render small face portraits of 3D models into data URLs (for HUD frames)
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 let rt = null, scene = null, cam = null;
 const cache = new Map();
@@ -20,7 +21,7 @@ function setup(renderer) {
 export function renderPortrait(renderer, key, object, focusY, dist = 1.1, { yaw = 0.35, env = null } = {}) {
   if (key && cache.has(key)) return cache.get(key);
   setup(renderer);
-  const clone = object.clone(true);
+  const clone = SkeletonUtils.clone(object); // rebinds skinned meshes to the cloned bones (plain clone would keep the originals)
   clone.position.set(0, 0, 0);
   clone.rotation.set(0, 0, 0);
   clone.scale.copy(object.scale);

@@ -262,7 +262,7 @@ function deformHead(geo, R) {
 }
 
 // ------------------------------------------------------------------ materials
-function makeMats(o) {
+export function makeMats(o) {
   const std = (color, rough = 0.7, metal = 0, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
   return {
     skin: std(o.skin || '#ffdcc4', 0.62, 0, { }),

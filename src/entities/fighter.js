@@ -1,6 +1,8 @@
-// The player's Fighter: an original chibi swordsman design
+// The player's Fighter: the skinned /models/player.glb character when it is loaded (see playerModel.js),
+// otherwise the original procedural chibi swordsman
 import { createHumanoid } from './humanoid.js';
 import { Animator } from './anim.js';
+import { playerModelReady, createPlayerRig } from './playerModel.js';
 
 export const FIGHTER_LOOK = {
   name: 'fighter',
@@ -33,8 +35,9 @@ export const FIGHTER_LOOK = {
   },
 };
 
-export function createFighter(overrides = {}) {
-  const rig = createHumanoid({ ...FIGHTER_LOOK, ...overrides });
+export function createFighter(overrides = {}, { procedural = false } = {}) {
+  const look = { ...FIGHTER_LOOK, ...overrides };
+  const rig = !procedural && playerModelReady() ? createPlayerRig(look) : createHumanoid(look);
   const anim = new Animator(rig);
   return { rig, anim, root: rig.root };
 }
