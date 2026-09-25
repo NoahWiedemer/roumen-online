@@ -1,6 +1,7 @@
 // Backdrop pieces shared by the title screen and the character-select terrace: gradient sky dome with a sun
 // glow, layered mountain silhouettes fading into the haze, soft billboard clouds and small mesh helpers.
 import * as THREE from 'three';
+import { SPH, SPH_LO } from '../core/prims.js';
 
 export function skyDome({ top = '#27366e', mid = '#6f7fc4', horizon = '#ffb27a', glow = '#ffd9a0', sunDir = new THREE.Vector3(0.5, 0.12, -1), radius = 600 } = {}) {
   const mat = new THREE.ShaderMaterial({
@@ -97,35 +98,7 @@ export function cloud({ x, y, z, w = 40, color = '#ffd2c0', opacity = 0.85 }) {
   return s;
 }
 
-// standard material shortcut
-export function mat(color, o = {}) {
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: o.roughness ?? 0.75, metalness: o.metalness ?? 0, ...o });
-}
-
-// a mesh ellipsoid
-const SPH = new THREE.SphereGeometry(1, 20, 14);
-const SPH_LO = new THREE.SphereGeometry(1, 12, 8);
-export function blob(material, sx, sy, sz, x = 0, y = 0, z = 0, lo = false) {
-  const m = new THREE.Mesh(lo ? SPH_LO : SPH, material);
-  m.scale.set(sx, sy, sz);
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  return m;
-}
-
-// a tapered cylinder between two points (bones, horns, posts)
-const _up = new THREE.Vector3(0, 1, 0);
-export function limb(material, a, b, r0, r1, seg = 8) {
-  const d = new THREE.Vector3().subVectors(b, a);
-  const len = d.length();
-  const g = new THREE.CylinderGeometry(r1, r0, len, seg, 1);
-  g.translate(0, len / 2, 0);
-  const m = new THREE.Mesh(g, material);
-  m.position.copy(a);
-  m.quaternion.setFromUnitVectors(_up, d.normalize());
-  m.castShadow = true;
-  return m;
-}
+export { mat, blob, limb } from '../core/prims.js';
 
 // dispose everything below an object (geometries, materials and their textures)
 export function disposeTree(root) {

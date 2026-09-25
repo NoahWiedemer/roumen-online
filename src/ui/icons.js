@@ -2368,6 +2368,51 @@ ITEMS.robo_blades = (ctx) => itemFrame(ctx, '#b050ff', () => {
   sparkle(ctx, 80, 26, 4.5, '#ffffff', '#6aa8ff');
 });
 
+// mount summons: a raccoon face on a ribbon (Raccoon Whistle) and a donkey head with a brass bell (Donkey Bell)
+ITEMS.mount_raccoon = (ctx) => itemFrame(ctx, '#ffb347', () => {
+  obj(ctx, (l) => {
+    const E = (x, y, rx, ry, fill, stroke = '#1e1612', lw = 1) => { l.beginPath(); l.ellipse(x, y, rx, ry, 0, 0, TAU); l.fillStyle = fill; l.fill(); if (stroke) { l.lineWidth = lw; l.strokeStyle = stroke; l.stroke(); } };
+    // ears
+    for (const sx of [-1, 1]) {
+      l.beginPath(); l.moveTo(50 + sx * 14, 36); l.lineTo(50 + sx * 30, 14); l.lineTo(50 + sx * 34, 40); l.closePath();
+      l.fillStyle = '#8b7d70'; l.fill(); l.lineWidth = 1.2; l.strokeStyle = '#1e1612'; l.stroke();
+      l.beginPath(); l.moveTo(50 + sx * 18, 36); l.lineTo(50 + sx * 29, 21); l.lineTo(50 + sx * 31, 38); l.closePath(); l.fillStyle = '#302a26'; l.fill();
+    }
+    E(50, 54, 32, 27, lin(l, 0, 28, 0, 82, ['#a89a8c', '#8b7d70', '#6a5e54']), '#1e1612', 1.4);   // head
+    E(50, 66, 22, 15, '#eee6da', null);                                                         // cheeks
+    l.beginPath(); l.moveTo(20, 50); l.quadraticCurveTo(35, 40, 50, 50); l.quadraticCurveTo(65, 40, 80, 50);
+    l.quadraticCurveTo(66, 62, 50, 56); l.quadraticCurveTo(34, 62, 20, 50); l.closePath(); l.fillStyle = '#26201c'; l.fill();   // mask
+    for (const sx of [-1, 1]) {
+      E(50 + sx * 13, 51, 5, 5.5, '#0e0c0e', null);
+      E(50 + sx * 11.5, 49, 1.8, 2, '#ffffff', null);
+      l.beginPath(); l.ellipse(50 + sx * 14, 40, 7, 2.2, sx * 0.25, 0, TAU); l.fillStyle = '#f4efe6'; l.fill();   // brows
+    }
+    E(50, 64, 5, 3.6, '#1a1416', null);                                                        // nose
+    l.beginPath(); l.moveTo(45, 70); l.quadraticCurveTo(50, 74, 55, 70); l.strokeStyle = '#3a2e28'; l.lineWidth = 1.2; l.stroke();
+  }, { glow: '#ffd27a', glowR: 4, glowA: 0.5 });
+  sparkle(ctx, 80, 22, 4.5, '#ffffff', '#ffd27a');
+});
+ITEMS.mount_donkey = (ctx) => itemFrame(ctx, '#7ad0ff', () => {
+  obj(ctx, (l) => {
+    const E = (x, y, rx, ry, fill, stroke = '#1e1a18', lw = 1, rot = 0) => { l.beginPath(); l.ellipse(x, y, rx, ry, rot, 0, TAU); l.fillStyle = fill; l.fill(); if (stroke) { l.lineWidth = lw; l.strokeStyle = stroke; l.stroke(); } };
+    // long ears with dark tips
+    for (const sx of [-1, 1]) {
+      E(50 + sx * 15, 24, 6.5, 19, '#8f8a84', '#1e1a18', 1.2, sx * 0.35);
+      E(50 + sx * 15, 26, 3.4, 13, '#ece8df', null, 1, sx * 0.35);
+      E(50 + sx * 21, 8, 4, 5, '#4e4843', null, 1, sx * 0.35);
+    }
+    E(50, 50, 22, 22, lin(l, 0, 28, 0, 72, ['#a6a19a', '#8f8a84', '#6f6a64']), '#1e1a18', 1.4);   // head
+    E(50, 70, 17, 13, '#ece8df', '#1e1a18', 1.2);                                               // muzzle
+    for (const sx of [-1, 1]) { E(50 + sx * 6, 72, 2.2, 3, '#4e4843', null); E(50 + sx * 11, 46, 4, 4.6, '#0e0c0e', null); E(50 + sx * 10, 44.5, 1.5, 1.7, '#ffffff', null); }
+    for (let i = 0; i < 4; i++) E(50, 28 + i * 4, 4 - i * 0.4, 3, '#4e4843', null);             // forelock
+    // brass bell on a strap
+    l.beginPath(); l.moveTo(34, 84); l.quadraticCurveTo(50, 90, 66, 84); l.strokeStyle = '#6b4428'; l.lineWidth = 3; l.stroke();
+    l.beginPath(); l.moveTo(44, 96); l.quadraticCurveTo(44, 84, 50, 84); l.quadraticCurveTo(56, 84, 56, 96); l.closePath();
+    l.fillStyle = lin(l, 44, 84, 56, 96, ['#fff2b0', '#e2b44f', '#8a6418']); l.fill(); l.lineWidth = 1; l.strokeStyle = '#4a3208'; l.stroke();
+  }, { glow: '#b8e6ff', glowR: 4, glowA: 0.5 });
+  sparkle(ctx, 22, 20, 4.5, '#ffffff', '#9ad8ff');
+});
+
 // a small bundle of long wiry whiskers tied with a string
 ITEMS.rat_whisker = (ctx) => itemFrame(ctx, '#c8c0d8', () => {
   obj(ctx, (l) => {

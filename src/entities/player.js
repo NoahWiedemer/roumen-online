@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createFighter } from './fighter.js';
 import { Trail } from './effects.js';
 import { dualBladesReady, attachDualBlades, bladeTime } from './weapons.js';
+import { createMount, MOUNTS } from './mounts.js';
 import { G } from '../game/game.js';
 import { clamp, dampAngle, angleDiff, lerp } from '../core/utils.js';
 import {
@@ -62,6 +63,7 @@ export class Player {
     this.trailL = null;        // off-hand trail (dual blades)
     this.dual = null;          // { right, left } blade meshes once dual blades were equipped
     this.flags = {};           // one-time story flags, e.g. 'gift:robo'
+    this.mount = null;         // { kind, model } while riding
     this.stuckT = 0;
     for (const [id, n] of STARTING.inventory) this.addItem(id, n, true);
     for (const [slot, id] of Object.entries(STARTING.equipment)) this.equipment[slot] = id;
@@ -129,6 +131,11 @@ export class Player {
     for (let i = 0; i < INV_SIZE && n > 0; i++) {
       if (!this.inventory[i]) { const add = Math.min(n, stack); this.inventory[i] = { id, n: add }; n -= add; }
     }
+    // a new mount goes straight onto the first free skill bar slot
+    if (it.type === 'mount' && !silent && !this.skillbar.some((e) => e && e.type === 'item' && e.id === id)) {
+      const free = this.skillbar.findIndex((e, i) => !e && i < 12);
+      if (free >= 0) this.skillbar[free] = { type: 'item', id };
+    }
     if (!silent) G.emit('inventory');
     if (n > 0 && !silent) G.msg('Your inventory is full.', 'warn');
     return n;
@@ -147,7 +154,7 @@ export class Player {
     const s = this.inventory[i];
     if (!s) return;
     const it = ITEMS[s.id];
-    if (it.type === 'consumable') this.useItem(s.id);
+    if (it.type === 'consumable' || it.type === 'mount') this.useItem(s.id);
     else if (['weapon', 'armor', 'helm', 'pants', 'boots', 'gloves', 'ring', 'necklace', 'earring'].includes(it.type)) this.equipFromSlot(i);
   }
   equipFromSlot(i) {
@@ -160,7 +167,7 @@ export class Player {
     this.equipment[slot] = s.id;
     this.inventory[i] = prev ? { id: prev, n: 1 } : null;
     this.recalc();
-    if (slot === 'weapon') this.applyWeaponLook();
+    if (slot === 'weapon') { this.applyWeaponLook(); if (this.mount) this.setWeaponsHidden(true); }
     G.audio.play('pickup');
     G.msg(`Equipped ${it.name}.`);
     G.emit('inventory');
@@ -173,7 +180,7 @@ export class Player {
     delete this.equipment[slot];
     this.addItem(id, 1);
     this.recalc();
-    if (slot === 'weapon') this.applyWeaponLook();
+    if (slot === 'weapon') { this.applyWeaponLook(); if (this.mount) this.setWeaponsHidden(true); }
     G.emit('inventory');
   }
   applyWeaponLook() {
@@ -221,6 +228,7 @@ export class Player {
     const it = ITEMS[id];
     if (!it || this.dead) return;
     if (this.countItem(id) <= 0) { G.msg(`You have no ${it.name}.`, 'warn'); G.audio.play('error'); return; }
+    if (it.type === 'mount') { this.toggleMount(it.mount); return; }     // mount items are not used up
     const cdKey = 'item:' + (it.heal ? 'hp' : it.mana ? 'sp' : id);
     if (this.cooldowns[cdKey] > 0) { G.msg('That item is not ready yet.', 'warn'); return; }
     if (it.heal) { if (this.hp >= this.stats.maxHp) { G.msg('Your HP is already full.', 'warn'); return; } this.heal(it.heal); G.audio.play('potion'); }
@@ -271,6 +279,57 @@ export class Player {
     G.cam.snap(this.pos);
   }
 
+  // ---------------------------------------------------------------- mounts
+  // summon / dismiss a mount (like in Fiesta: the summoning item stays in the bag; attacking dismounts)
+  toggleMount(kind) {
+    if (this.dead) return;
+    if (this.mount) { const same = this.mount.kind === kind; this.dismount(); if (same) return; }
+    if (this.inCombatT > 0) { G.msg('You cannot summon a mount during combat.', 'warn'); G.audio.play('error'); return; }
+    if (this.airborne || this.inHouse) return;
+    this.standUp();
+    this.autoAttack = false; this.pending = null;
+    const model = createMount(kind);
+    model.root.position.copy(this.pos);
+    model.root.rotation.y = this.rotY;
+    this.root.parent.add(model.root);
+    this.mount = { kind, model };
+    this.anim.rideTarget = 1;
+    this.anim.ride = 1;
+    this.anim.stop();
+    this.setWeaponsHidden(true);
+    const at = this.pos.clone().add(new THREE.Vector3(0, 0.7, 0));
+    G.fx.poof(at, '#fff6e0', 26);
+    G.fx.ring(this.pos.clone(), { color: '#ffe39a', from: 0.4, to: 2.8, life: 0.55 });
+    G.audio.play('buff');
+    G.msg(`You summon your ${MOUNTS[kind].name}. (Use it again to dismount.)`);
+    G.emit('mount');
+  }
+  dismount(quiet = false) {
+    if (!this.mount) return;
+    const m = this.mount.model;
+    if (m.root.parent) m.root.parent.remove(m.root);
+    m.root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    this.mount = null;
+    this.anim.rideTarget = 0;
+    this.anim.ride = 0;
+    this.root.rotation.x = 0;
+    this.setWeaponsHidden(false);
+    if (!quiet) {
+      G.fx.poof(this.pos.clone().add(new THREE.Vector3(0, 0.7, 0)), '#fff6e0', 20);
+      G.audio.play('close');
+    }
+    G.emit('mount');
+  }
+  setWeaponsHidden(hide) {
+    if (!hide) { this.applyWeaponLook(); return; }
+    if (this.rig.weapon) this.rig.weapon.visible = false;
+    if (this.dual) this.dual.right.visible = this.dual.left.visible = false;
+  }
+  moveSpeed() {
+    if (this.mount) return this.running ? MOUNTS[this.mount.kind].speed : WALK_SPEED * 1.4;
+    return this.running ? RUN_SPEED : WALK_SPEED;
+  }
+
   // ---------------------------------------------------------------- buffs
   addBuff(id, dur, data = {}) {
     const ex = this.buffs.find((b) => b.id === id);
@@ -315,7 +374,10 @@ export class Player {
   }
 
   // ---------------------------------------------------------------- combat
-  headPos() { return new THREE.Vector3(this.pos.x, this.pos.y + this.height + 0.1, this.pos.z); }
+  headPos() {
+    const lift = this.mount ? this.root.position.y - this.pos.y : 0;     // riding raises the head
+    return new THREE.Vector3(this.pos.x, this.pos.y + this.height + 0.1 + lift, this.pos.z);
+  }
   get groundY() { return this.pos.y; }
 
   setTarget(t) {
@@ -331,6 +393,7 @@ export class Player {
     this.autoAttack = true;
     this.pending = null;
     this.standUp();
+    if (this.mount) this.dismount();
   }
   stopActions() {
     this.autoAttack = false; this.pending = null; this.path = null;
@@ -342,6 +405,7 @@ export class Player {
     if (this.dead) return;
     if (this.sitting) { this.standUp(); return; }
     if (this.anim.busy || this.airborne) return;
+    if (this.mount) this.dismount();
     this.stopActions();
     this.sitting = true;
     this.anim.sitTarget = 1;
@@ -372,6 +436,7 @@ export class Player {
     if ((this.cooldowns[id] || 0) > 0) { G.msg(`${sk.name} is not ready yet.`, 'warn'); G.audio.play('error'); return; }
     if (this.sp < sk.sp) { G.msg('Not enough SP.', 'warn'); G.audio.play('error'); return; }
     this.standUp();
+    if (this.mount) this.dismount();
     if (sk.kind === 'melee') {
       let t = this.target && !this.target.isNpc && !this.target.dead ? this.target : null;
       if (!t) t = G.monsters.nearestTarget(this.pos, sk.dash ? sk.range + 2 : 8);
@@ -507,6 +572,7 @@ export class Player {
     this.stopActions();
     this.setTarget(null);
     this.sitting = false; this.anim.sitTarget = 0;
+    this.dismount(true);
     this.anim.die();
     G.msg('You have been knocked out!', 'warn');
     G.emit('death');
@@ -564,7 +630,7 @@ export class Player {
       if (input.wasPressed('KeyZ')) { this.running = !this.running; G.msg(this.running ? 'Run mode.' : 'Walk mode.'); }
       if (input.wasPressed('Space')) this.jump();
 
-      const maxSpeed = this.running ? RUN_SPEED : WALK_SPEED;
+      const maxSpeed = this.moveSpeed();
       const slowed = this.buffs.some((b) => b.id === 'slowed') ? 0.6 : 1;
       if ((ix || iz) && !busy) {
         this.standUp();
@@ -633,7 +699,7 @@ export class Player {
         const wp = this.path[0];
         const dx = wp[0] - this.pos.x, dz = wp[1] - this.pos.z;
         const d = Math.hypot(dx, dz);
-        const maxSpeedP = (this.running ? RUN_SPEED : WALK_SPEED) * slowed;
+        const maxSpeedP = this.moveSpeed() * slowed;
         if (d < 0.25) {
           this.path.shift();
           if (!this.path.length) this.path = null;
@@ -682,13 +748,25 @@ export class Player {
     }
     this.pos.y = gh + this.jumpY;
 
-    // animation
-    const target = moving ? clamp(speed / RUN_SPEED, 0.35, 1) : 0;
+    // animation (riding: the mount runs, the rider sits in the saddle and rocks with it)
+    const riding = !!this.mount;
+    const target = moving && !riding ? clamp(speed / RUN_SPEED, 0.35, 1) : 0;
     this.anim.speed = this.anim.speed + (target - this.anim.speed) * (1 - Math.exp(-12 * dt));
-    this.anim.groundSpeed = moving ? speed : 0;
-    this.anim.setAirborne(this.airborne, this.velY);
+    this.anim.groundSpeed = moving && !riding ? speed : 0;
+    this.anim.setAirborne(this.airborne && !riding, this.velY);
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
+    if (riding) {
+      const m = this.mount.model;
+      m.root.position.copy(this.pos);
+      m.root.rotation.y = this.rotY;
+      m.update(dt, moving ? speed : 0);
+      m.root.updateMatrixWorld(true);
+      m.seat.getWorldPosition(this._fwd);
+      const top = this.rig.legGeo ? this.rig.legGeo.top : 0.85;
+      this.root.position.set(this._fwd.x, this._fwd.y - top, this._fwd.z);
+      this.root.rotation.set(m.body.rotation.x, this.rotY, 0, 'YXZ');
+    }
     this.anim.update(dt, this.pos);
     if (this.airborne) this.rig.body.position.y += 0; // body offset handled by pos
 
@@ -736,6 +814,7 @@ export class Player {
   }
 
   basicAttack(t) {
+    if (this.mount) this.dismount();
     const dual = this.isDual();
     // sword: 3-hit combo; dual blades: faster 4-hit combo (hits 3 and 4 strike twice for a bit less each)
     const n = dual ? 4 : 3;

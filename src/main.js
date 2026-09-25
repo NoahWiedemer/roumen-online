@@ -426,6 +426,7 @@ Player.prototype.toggleHouse = function () {
   if (G.npcs.list.some((n) => Math.hypot(n.pos.x - this.pos.x, n.pos.z - this.pos.z) < 4)) { G.msg('Too close to someone to set up your mini house.', 'warn'); return; }
   this.stopActions();
   this.standUp();
+  if (this.mount) this.dismount();
   this.inHouse = true;
   this.sitting = true;
   if (!house) house = createMiniHouse();

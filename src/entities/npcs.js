@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { createHumanoid } from './humanoid.js';
 import { Animator, P_IDLE, fullPose } from './anim.js';
 import { createNpcRig } from './npcModels.js';
+import { createMount } from './mounts.js';
 import { NPCS } from '../game/data.js';
 import { G } from '../game/game.js';
 import { dampAngle } from '../core/utils.js';
@@ -102,6 +103,16 @@ export class NPC {
     this.marker = null;
     (env.parent || G.scene).add(this.root);
     if (!this.wander) (env.colliders || G.colliders).addCircle(spot.x, spot.z, 0.5);
+    // a mount standing next to its keeper (def.pet = mount kind)
+    if (def.pet) {
+      this.pet = createMount(def.pet);
+      const a = this.homeRot + Math.PI / 2;
+      const px = spot.x + Math.sin(a) * 1.9, pz = spot.z + Math.cos(a) * 1.9;
+      this.pet.root.position.set(px, terrain.groundAt(px, pz), pz);
+      this.pet.root.rotation.y = this.homeRot - 0.5;
+      (env.parent || G.scene).add(this.pet.root);
+      (env.colliders || G.colliders).addCircle(px, pz, 0.8);
+    }
     this.buildMarker();
   }
   headPos() { return new THREE.Vector3(this.pos.x, this.pos.y + this.height + 0.1, this.pos.z); }
@@ -166,6 +177,7 @@ export class NPC {
     if (this.marker.visible) this.marker.position.y = (this.height + 0.85 + Math.sin(G.time * 3) * 0.08) / this.rootScale;
     this.root.visible = d < 120;
     if (d < 70) this.anim.update(dt, null);
+    if (this.pet) { this.pet.root.visible = d < 120; if (d < 70) this.pet.update(dt, 0); }
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
   }

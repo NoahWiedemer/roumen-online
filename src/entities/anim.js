@@ -105,6 +105,15 @@ export const P_SIT = {
   legL: [-1.45, 0.35, 0.75], kneeL: [2.35, 0, 0], footL: [-0.3, 0, 0],
   legR: [-1.45, -0.35, -0.75], kneeR: [2.35, 0, 0], footR: [-0.3, 0, 0],
 };
+// riding a mount: straddling the saddle, knees bent along the flanks, both hands forward on the reins
+export const P_RIDE = {
+  pos: [0, 0, 0],
+  hips: [0, 0, 0], spine: [0.14, 0, 0], chest: [0.04, 0, 0], neck: [0, 0, 0], head: [-0.12, 0, 0],
+  armL: [-0.7, 0, 0.12], elbowL: [-0.95, 0, 0], handL: [0.25, 0, 0],
+  armR: [-0.7, 0, -0.12], elbowR: [-0.95, 0, 0], handR: [0.25, 0, 0],
+  legL: [-0.7, 0.35, 0.95], kneeL: [1.25, 0, 0], footL: [0.2, 0, -0.3],
+  legR: [-0.7, -0.35, -0.95], kneeR: [1.25, 0, 0], footR: [0.2, 0, 0.3],
+};
 export const P_DEAD = {
   pos: [0, -0.52, -0.2],
   hips: [-1.45, 0.1, 0], spine: [0.08, 0, 0], chest: [0.05, 0, 0], neck: [0, 0, 0], head: [-0.2, 0.5, 0],
@@ -180,7 +189,7 @@ export function fullPose(p) {
   for (const ch of CHANNELS) if (!p[ch]) p[ch] = zero();
   return p;
 }
-fullPose(P_IDLE); fullPose(P_BATTLE); fullPose(P_SIT); fullPose(P_DEAD); fullPose(P_DUAL_IDLE); fullPose(P_DUAL_BATTLE);
+fullPose(P_IDLE); fullPose(P_BATTLE); fullPose(P_SIT); fullPose(P_RIDE); fullPose(P_DEAD); fullPose(P_DUAL_IDLE); fullPose(P_DUAL_BATTLE);
 
 // Re-base a clip for another weapon style: every channel that was taken verbatim from a library pose
 // (e.g. `...P_BATTLE`) is swapped for the matching channel of the style's pose. Hit reactions, pick-up,
@@ -489,6 +498,7 @@ export class Animator {
     this.battle = 0;        // 0..1 blend towards battle stance
     this.battleTarget = 0;
     this.sit = 0; this.sitTarget = 0;
+    this.ride = 0; this.rideTarget = 0;   // mounted pose blend
     this.dead = false;
     this.action = null;     // { clip, t, speed, weight, fadeIn, fadeOut, onEvent, firedEvents }
     this.base = emptyPose();
@@ -683,6 +693,10 @@ export class Animator {
       this.landT = Math.max(0, this.landT - dt);
     }
     if (this.sit > 0.001) blendPose(J, P_SIT, this.sit, J);
+    if (this.ride > 0.001) {
+      blendPose(J, P_RIDE, this.ride, J);
+      J.spine[0] += Math.sin(t * 2.1) * 0.012 * this.ride;
+    }
   }
   // controller hooks: airborne state / landing impact
   setAirborne(on, velY = 0) {
@@ -695,6 +709,7 @@ export class Animator {
     this.t += dt;
     this.battle += (this.battleTarget - this.battle) * (1 - Math.exp(-6 * dt));
     this.sit += (this.sitTarget - this.sit) * (1 - Math.exp(-5 * dt));
+    this.ride += (this.rideTarget - this.ride) * (1 - Math.exp(-12 * dt));
     this.air += ((this.inAir ? 1 : 0) - this.air) * (1 - Math.exp(-(this.inAir ? 12 : 20) * dt));
     this.locomotion(dt);
 

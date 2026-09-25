@@ -6,6 +6,7 @@ import {
 } from '../game/data.js';
 import { formatMoney } from '../core/utils.js';
 import { moneyText } from '../entities/loot.js';
+import { MOUNTS } from '../entities/mounts.js';
 import { WORLD, TOWN } from '../world/layout.js';
 
 const el = (tag, cls, parent, html) => {
@@ -202,9 +203,10 @@ export class Windows {
   itemTip(id, { price = null, sell = false } = {}) {
     const it = ITEMS[id];
     if (!it) return '';
-    const typeName = { consumable: 'Consumable', material: 'Material', weapon: 'One-Handed Sword', armor: 'Armor', helm: 'Helmet', pants: 'Pants', boots: 'Boots', gloves: 'Gloves', ring: 'Ring', necklace: 'Necklace', earring: 'Earring' }[it.type] || it.type;
-    const col = { weapon: '#ffd060', armor: '#7fd0ff', helm: '#7fd0ff', pants: '#7fd0ff', boots: '#7fd0ff', gloves: '#7fd0ff', ring: '#d49aff', necklace: '#d49aff', earring: '#d49aff' }[it.type] || '#ffffff';
+    const typeName = { consumable: 'Consumable', material: 'Material', weapon: it.weaponClass === 'dual' ? 'Dual Blades' : 'One-Handed Sword', armor: 'Armor', helm: 'Helmet', pants: 'Pants', boots: 'Boots', gloves: 'Gloves', ring: 'Ring', necklace: 'Necklace', earring: 'Earring', mount: 'Mount' }[it.type] || it.type;
+    const col = { weapon: '#ffd060', armor: '#7fd0ff', helm: '#7fd0ff', pants: '#7fd0ff', boots: '#7fd0ff', gloves: '#7fd0ff', ring: '#d49aff', necklace: '#d49aff', earring: '#d49aff', mount: '#8cff9a' }[it.type] || '#ffffff';
     let s = `<div class="tt-name" style="color:${col}">${esc(it.name)}</div><div class="tt-type">${typeName}</div>`;
+    if (it.mount) s += `<div class="tt-stat">Riding speed +${Math.round((MOUNTS[it.mount].speed / 6.2 - 1) * 100)}%</div>`;
     if (it.atk) s += `<div class="tt-stat">Attack ${it.atk[0]} ~ ${it.atk[1]}</div>`;
     if (it.def) s += `<div class="tt-stat">Defense +${it.def}</div>`;
     for (const k of ['str', 'end', 'dex', 'int', 'spr', 'hp', 'sp']) if (it[k]) s += `<div class="tt-stat">${k === 'hp' ? 'Max HP' : k === 'sp' ? 'Max SP' : STAT_NAMES[k]} +${it[k]}</div>`;
@@ -269,8 +271,8 @@ export class Windows {
         const cur = p.inventory[idx];
         if (!cur) return '';
         const def = ITEMS[cur.id];
-        const hint = this.shopNpc ? '<div class="tt-type">Right-click to sell</div>' : def.type === 'consumable' ? '<div class="tt-type">Right-click to use</div>' : def.type !== 'material' ? '<div class="tt-type">Right-click to equip</div>' : '';
-        return this.itemTip(cur.id, this.shopNpc ? { price: Math.max(1, Math.floor(def.price * 0.3)) * cur.n, sell: true } : {}) + hint;
+        const hint = this.shopNpc ? (def.type === 'mount' ? '' : '<div class="tt-type">Right-click to sell</div>') : def.type === 'consumable' ? '<div class="tt-type">Right-click to use</div>' : def.type === 'mount' ? '<div class="tt-type">Right-click to ride / dismount</div>' : def.type !== 'material' ? '<div class="tt-type">Right-click to equip</div>' : '';
+        return this.itemTip(cur.id, this.shopNpc && def.type !== 'mount' ? { price: Math.max(1, Math.floor(def.price * 0.3)) * cur.n, sell: true } : {}) + hint;
       };
       s.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -299,6 +301,7 @@ export class Windows {
     const cur = p.inventory[idx];
     if (!cur) return;
     const def = ITEMS[cur.id];
+    if (def.type === 'mount') { G.msg('You would never sell your trusty companion!', 'warn'); G.audio.play('error'); return; }
     const price = Math.max(1, Math.floor(def.price * 0.3)) * cur.n;
     p.inventory[idx] = null;
     p.money += price;

@@ -117,6 +117,12 @@ export const ITEMS = {
     desc: 'Twin fangs of Robo, King of Beasts. One burns red like the setting sun, one glows blue like the deep sea.',
     look: { model: 'robosword', glowR: '#ff2a3c', glowL: '#2a7bff' } },
 
+  // ---- mounts (type 'mount': using the item summons or dismisses the mount; it is never used up)
+  mount_raccoon: { name: 'Raccoon Whistle', type: 'mount', mount: 'raccoon', icon: 'mount_raccoon', price: 0,
+    desc: 'Calls your raccoon friend. A chubby, cheerful ride. Use again to dismount. Attacking dismounts too.' },
+  mount_donkey: { name: 'Donkey Bell', type: 'mount', mount: 'donkey', icon: 'mount_donkey', price: 0,
+    desc: 'Rings for Nilo\'s donkey. Stubborn, but surprisingly quick. Use again to dismount. Attacking dismounts too.' },
+
   armor_cloth: { name: 'Padded Vest', type: 'armor', icon: 'armor_cloth', lv: 1, def: 3, price: 25, desc: 'Better than nothing.' },
   armor_leather: { name: 'Leather Cuirass', type: 'armor', icon: 'armor_leather', lv: 4, def: 8, hp: 10, price: 420, desc: 'Hardened leather armor.' },
   armor_plate: { name: 'Crimson Plate', type: 'armor', icon: 'armor_plate', lv: 8, def: 16, hp: 30, price: 2600, desc: 'Red-lacquered plate with golden trim.' },
@@ -242,6 +248,9 @@ export const NPCS = [
     greet: 'My ship isn\'t ready to sail yet. Come back when the harbour is open for voyages!' },
   { id: 'sailor', spot: 14, rot: 3.6, name: 'Finn', title: 'Sailor', look: 'merchant', roles: ['talk'],
     greet: 'Arr, the sea breeze on this island is the best in all of Roumen.' },
+  // stable keeper: gives the mounts through a short starter quest chain; his donkey waits next to him
+  { id: 'stable', pos: [-34.5, 13.5], rot: 0.9, name: 'Nilo', title: 'Stable Keeper', look: 'farmer', roles: ['quest'], pet: 'donkey',
+    greet: 'Still walking everywhere on foot? My critters could carry you — if you help us out a little first.' },
 
   // ---- Cyclone Hill / Forest of Mist (world: 'cyclone'; pos = world x,z instead of a Roumen map spot)
   { id: 'sir_ratman', world: 'cyclone', pos: [6, 146], rot: Math.PI, name: 'Sir Ratman', title: 'Rat Knight', model: 'ratman', roles: ['quest'],
@@ -287,6 +296,19 @@ export const QUESTS = {
     text: 'Slimes are bouncing around the western path above town. Take the ramp at the west end of the main street and defeat 5 Slimes.',
     goal: { type: 'kill', target: 'slime', count: 5 },
     reward: { exp: 30, copper: 120, items: [['sword_bronze', 1]] },
+  },
+  // stable keeper chain: raccoon mount first, then the (faster) donkey
+  q_mount_raccoon: {
+    name: 'A Raccoon Friend', giver: 'stable', level: 1,
+    text: 'A young raccoon keeps getting chased by slimes on the western path above town. Defeat 5 Slimes so it feels safe again — then it will gladly carry you around.',
+    goal: { type: 'kill', target: 'slime', count: 5 },
+    reward: { exp: 25, copper: 60, items: [['mount_raccoon', 1]] },
+  },
+  q_mount_donkey: {
+    name: 'The Stubborn Donkey', giver: 'stable', level: 2, requires: ['q_mount_raccoon'],
+    text: 'Nilo\'s donkey refuses to set a hoof outside while mushrooms stomp around the northern meadows. Defeat 5 Mushrooms and it will be your loyal (and quick) companion.',
+    goal: { type: 'kill', target: 'mushroom', count: 5 },
+    reward: { exp: 60, copper: 150, items: [['mount_donkey', 1]] },
   },
   q_spores: {
     name: 'A Spore Harvest', giver: 'smith', level: 3,
