@@ -409,6 +409,7 @@ function handleInput(dt) {
   if (inp.wasPressed('KeyE')) p.useStone('sp');
   if (inp.wasPressed('Home')) p.toggleSit();
   if (inp.wasPressed('KeyH')) p.toggleHouse();
+  if (inp.wasPressed('KeyU')) ui.toggleHidden();
   const winKeys = { KeyC: 'character', KeyI: 'inventory', KeyK: 'skills', KeyL: 'quests', KeyM: 'map', KeyV: 'actions', KeyF: 'community', KeyX: 'store', F10: 'help' };
   for (const [k, w] of Object.entries(winKeys)) if (inp.wasPressed(k)) ui.win.toggle(w);
   if (inp.wasPressed('Escape')) {

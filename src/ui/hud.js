@@ -53,6 +53,20 @@ export class HUD {
     G.on('death', () => this.win.showDeath());
   }
 
+  // hide / show the whole interface (key U or the Options window) for screenshots and sightseeing;
+  // the game keeps running, floating damage numbers stay
+  setHidden(hidden) {
+    this.hidden = hidden;
+    this.root.style.display = hidden ? 'none' : '';
+    this.plates.layer.style.display = hidden ? 'none' : '';
+    if (!this.toastEl) { this.toastEl = document.createElement('div'); this.toastEl.id = 'ui-toast'; document.body.appendChild(this.toastEl); }
+    this.toastEl.textContent = hidden ? 'Interface hidden — press U to show it again' : '';
+    this.toastEl.classList.toggle('show', hidden);
+    clearTimeout(this.toastT);
+    if (hidden) this.toastT = setTimeout(() => this.toastEl.classList.remove('show'), 2600);
+  }
+  toggleHidden() { this.setHidden(!this.hidden); }
+
   build() {
     const R = this.root;
     // ---------------- player frame

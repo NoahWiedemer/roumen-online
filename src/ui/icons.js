@@ -2368,6 +2368,63 @@ ITEMS.robo_blades = (ctx) => itemFrame(ctx, '#b050ff', () => {
   sparkle(ctx, 80, 26, 4.5, '#ffffff', '#6aa8ff');
 });
 
+// armour set variants: an existing icon recoloured (hue / saturation of `color`, shading of the original)
+function recoloured(base, color, amount = 0.8) {
+  return (ctx) => {
+    ITEMS[base](ctx);
+    ctx.save();
+    rr(ctx, 0.5, 0.5, 99, 99, 9); ctx.clip();
+    ctx.globalCompositeOperation = 'color';
+    ctx.globalAlpha = amount;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 100, 100);
+    ctx.restore();
+  };
+}
+ITEMS.traveler_tunic = recoloured('armor_cloth', '#3a6ad0');
+ITEMS.traveler_pants = recoloured('pants_leather', '#4a4e70', 0.7);
+ITEMS.traveler_shoes = recoloured('boots_leather', '#7a4a26', 0.5);
+ITEMS.ranger_vest = recoloured('armor_leather', '#5a8a3a');
+ITEMS.ranger_pants = recoloured('pants_leather', '#4a6a34');
+ITEMS.ranger_boots = recoloured('boots_leather', '#5a6a34', 0.6);
+ITEMS.ranger_hood = recoloured('helm_leather', '#5a8a3a');
+ITEMS.knight_plate = recoloured('armor_plate', '#9ab4e8', 0.75);
+ITEMS.knight_greaves = recoloured('pants_plate', '#9ab4e8', 0.55);
+ITEMS.knight_boots = recoloured('boots_plate', '#9ab4e8', 0.5);
+ITEMS.knight_helm = recoloured('helm_iron', '#9ab4e8', 0.5);
+
+// shop dual blades: two crossed blades of the pair's style
+function twinIcon(frame, style) {
+  return (ctx) => itemFrame(ctx, frame, () => {
+    const blade = (l, mirror) => {
+      l.save();
+      if (mirror) l.scale(-1, 1);
+      // grip, guard, pommel
+      rr(l, -2.4, 2, 4.8, 13, 1.4); l.fillStyle = lin(l, -3, 0, 3, 0, ['#6a4428', '#2e1a0c']); l.fill(); l.lineWidth = 0.7; l.strokeStyle = '#140a04'; l.stroke();
+      const metal = style === 'saber' ? ['#fff0c0', '#d0a040', '#6a4a10'] : style === 'fang' ? ['#8a96a6', '#3f454e', '#1a1e24'] : ['#f4f8ff', '#b8c2cf', '#6a7482'];
+      l.beginPath(); l.arc(0, 17, 3, 0, TAU); l.fillStyle = metal[1]; l.fill(); l.stroke();
+      rr(l, -9, -1.5, 18, 4, 1.5); l.fillStyle = lin(l, 0, -2, 0, 3, metal); l.fill(); l.stroke();
+      // blade outline per style
+      let pts;
+      if (style === 'dagger') pts = [[-3.2, -2], [-3, -34], [0, -46], [3, -34], [3.2, -2]];
+      else if (style === 'saber') pts = [[-2.2, -2], [-2.5, -24], [2, -46], [8, -56], [6, -40], [4.5, -20], [3.5, -2]];
+      else pts = [[-3, -2], [-6, -12], [-3.5, -18], [-7, -26], [-4, -32], [-6.5, -40], [-1, -52], [6, -58], [6, -40], [4, -20], [3.5, -2]];
+      const bl = style === 'fang' ? ['#5a6470', '#2a3038', '#15191e'] : style === 'saber' ? ['#e8eef6', '#aab4c2', '#5e6878'] : ['#ffffff', '#c6d0de', '#76808e'];
+      poly(l, pts); l.fillStyle = lin(l, -6, 0, 6, 0, bl); l.fill(); l.lineWidth = 1; l.strokeStyle = '#1a1e24'; l.stroke();
+      if (style === 'fang') { l.beginPath(); l.moveTo(3.5, -4); l.quadraticCurveTo(5.5, -30, 5.5, -54); l.strokeStyle = '#5affd4'; l.lineWidth = 1.4; l.stroke(); }
+      else { l.beginPath(); l.moveTo(0, -4); l.lineTo(style === 'saber' ? 2 : 0, style === 'saber' ? -40 : -38); l.strokeStyle = 'rgba(255,255,255,0.7)'; l.lineWidth = 0.8; l.stroke(); }
+      l.restore();
+    };
+    obj(ctx, (l) => {
+      l.save(); l.translate(36, 80); l.rotate(28 * D); blade(l, false); l.restore();
+      l.save(); l.translate(64, 80); l.rotate(-28 * D); blade(l, true); l.restore();
+    }, { glow: style === 'fang' ? '#5affd4' : '#ffffff', glowR: 3, glowA: style === 'fang' ? 0.5 : 0.3 });
+  });
+}
+ITEMS.twin_daggers = twinIcon('#c8d4e4', 'dagger');
+ITEMS.twin_sabers = twinIcon('#e8c870', 'saber');
+ITEMS.twin_fangs = twinIcon('#5affd4', 'fang');
+
 // mount summons: a raccoon face on a ribbon (Raccoon Whistle) and a donkey head with a brass bell (Donkey Bell)
 ITEMS.mount_raccoon = (ctx) => itemFrame(ctx, '#ffb347', () => {
   obj(ctx, (l) => {

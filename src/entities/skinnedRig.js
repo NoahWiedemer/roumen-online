@@ -143,8 +143,25 @@ export function createSkinnedRig(T, look = {}, extra = {}) {
     width: Math.abs(R[boneMap.legL].p.x - R[boneMap.legR].p.x) / 2,   // hip joint offset from the centre line
   };
 
+  // attachment frames for rigid gear (armour pieces): a group under the joint's bone, oriented like the proxy
+  // joint (limbs: -Y along the limb, +Z forward, +X to the character's left; torso: +Y up the spine)
+  const frames = {};
+  const jointFrame = (joint) => {
+    if (frames[joint]) return frames[joint];
+    const bone = bones[boneMap[joint]];
+    if (!bone) return null;
+    const f = new THREE.Group();
+    f.name = 'frame:' + joint;
+    f.quaternion.copy(T.offset[joint]).invert();
+    bone.add(f);
+    return (frames[joint] = f);
+  };
+  // bind-pose height range of the mesh (outfit shaders mask body regions by height)
+  skinned.geometry.computeBoundingBox();
+  const bindBox = skinned.geometry.boundingBox.clone();
+
   return {
-    root, body, joints: J, mats, weapon, weaponHolder, weaponHolderL, skinned, bones, legGeo,
+    root, body, joints: J, mats, weapon, weaponHolder, weaponHolderL, skinned, bones, legGeo, jointFrame, bindBox,
     tails: [], flaps: [], setExpression() {}, afterPose,
     hipY, height: T.height * scale, headRadius: 0.16 * scale, scale,
     portraitY: (extra.portraitY ?? T.height * 0.88) * scale, portraitDist: (extra.portraitDist ?? 0.72) * scale,

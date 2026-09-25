@@ -1,7 +1,7 @@
-// Dual blades (Robo Blades): robosword.glb is loaded once and baked into the weapon convention used by the rigs
-// (grip at the origin, blade along +Y, see humanoid.buildSword). Each blade gets a coloured energy glow:
-// a pulsing emissive band on the blade itself (masked so guard and grip stay dark) plus two additive glow shells
-// with a fresnel rim and energy flowing towards the tip. Right hand = red, left hand = blue (mirrored).
+// Dual blades. Robo Blades: robosword.glb is loaded once and baked into the weapon convention used by the rigs
+// (grip at the origin, blade along +Y, see humanoid.buildSword); they keep the model's own colours and get a red /
+// blue glow (glowing cutting edge, fresnel rim, soft camera-facing aura). Right hand = red, left hand = blue.
+// Shop dual blades (daggers, sabers, fangs) are built procedurally in the same convention.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -10,12 +10,13 @@ const MODELS = { robosword: BASE + 'models/robosword.glb' };
 const LENGTH = 1.08;       // blade + hilt length in metres
 const GRIP_AT = 0.874;     // grip centre as a fraction from the tip (-X) to the pommel (+X) in the source model
 const BLADE_FROM = 0.23;   // local y where the blade leaves the guard
+const PROCEDURAL = ['dagger', 'saber', 'fang'];
 
 export const bladeTime = { value: 0 };
 
 const templates = {};
 const loading = {};
-export function dualBladesReady(model = 'robosword') { return !!templates[model]; }
+export function dualBladesReady(model = 'robosword') { return PROCEDURAL.includes(model) || !!templates[model]; }
 export function preloadDualBlades(model = 'robosword') {
   if (templates[model]) return Promise.resolve(templates[model]);
   if (!loading[model]) loading[model] = new GLTFLoader().loadAsync(MODELS[model]).then((g) => (templates[model] = prepare(g.scene)));
@@ -224,8 +225,104 @@ export function createDualBlade(color, { mirror = false, phase = 0, model = 'rob
   return g;
 }
 
+// ------------------------------------------------------------------ shop dual blades (procedural)
+// dagger: short straight double edge; saber: curved single edge with a knuckle bow; fang: dark serrated blade
+// with a faint teal edge. `color` tints trails / sparks.
+const _tw = {};
+function twinMats() {
+  if (_tw.steel) return _tw;
+  _tw.steel = new THREE.MeshStandardMaterial({ color: '#d5dce5', metalness: 0.9, roughness: 0.22 });
+  _tw.iron = new THREE.MeshStandardMaterial({ color: '#b3bac3', metalness: 0.85, roughness: 0.34 });
+  _tw.dark = new THREE.MeshStandardMaterial({ color: '#3f454e', metalness: 0.8, roughness: 0.3 });
+  _tw.brass = new THREE.MeshStandardMaterial({ color: '#c9a04a', metalness: 0.85, roughness: 0.3 });
+  _tw.leather = new THREE.MeshStandardMaterial({ color: '#4a2e1c', roughness: 0.85 });
+  _tw.teal = new THREE.MeshStandardMaterial({ color: '#3ad0b0', emissive: new THREE.Color('#1fd6a8'), emissiveIntensity: 1.4, roughness: 0.3 });
+  return _tw;
+}
+function extrude(shape, depth, bevel) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 12 });
+  g.translate(0, 0, -depth / 2);
+  return g;
+}
+function add(parent, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
+  m.castShadow = true;
+  parent.add(m);
+  return m;
+}
+function buildTwinBlade(style) {
+  const M = twinMats();
+  const g = new THREE.Group();
+  const base = 0.09;                 // where the blade leaves the guard
+  let top;
+  if (style === 'dagger') {
+    const L = 0.42, W = 0.042;
+    const s = new THREE.Shape();
+    s.moveTo(-W, 0); s.lineTo(-W * 0.9, L * 0.72); s.lineTo(0, L); s.lineTo(W * 0.9, L * 0.72); s.lineTo(W, 0); s.lineTo(-W, 0);
+    add(g, extrude(s, 0.008, 0.006), M.steel, 0, base, 0);
+    add(g, new THREE.BoxGeometry(0.008, L * 0.7, 0.02), M.iron, 0, base + L * 0.36, 0);            // ridge
+    add(g, new THREE.BoxGeometry(0.17, 0.025, 0.035), M.iron, 0, base - 0.01, 0);                   // crossguard
+    for (const sx of [-1, 1]) add(g, new THREE.SphereGeometry(0.02, 10, 8), M.iron, sx * 0.09, base - 0.01, 0);
+    top = base + L;
+  } else if (style === 'saber') {
+    const L = 0.68, W = 0.045;
+    const s = new THREE.Shape();
+    s.moveTo(-W * 0.6, 0);
+    s.quadraticCurveTo(-W * 0.2, L * 0.6, W * 1.8, L);                   // curved back edge
+    s.quadraticCurveTo(W * 2.2, L * 0.55, W, 0);                          // cutting edge
+    s.lineTo(-W * 0.6, 0);
+    add(g, extrude(s, 0.007, 0.006), M.iron, 0, base, 0);
+    add(g, new THREE.CylinderGeometry(0.06, 0.06, 0.02, 16), M.brass, 0, base - 0.01, 0);           // disc guard
+    const bow = new THREE.TorusGeometry(0.07, 0.009, 6, 20, Math.PI);                               // knuckle bow
+    add(g, bow, M.brass, 0.055, -0.04, 0, 0, 0, -Math.PI / 2);
+    top = base + L;
+  } else {
+    const L = 0.72, W = 0.05;
+    const s = new THREE.Shape();
+    s.moveTo(-W * 0.7, 0);
+    // serrated back edge
+    const teeth = 7;
+    for (let i = 1; i <= teeth; i++) {
+      const t = i / (teeth + 1);
+      s.lineTo(-W * 0.7 - W * 0.55 * Math.sin(t * Math.PI) + (i % 2 ? -0.018 : 0.012), L * t);
+    }
+    s.quadraticCurveTo(W * 0.2, L * 1.02, W * 1.6, L);
+    s.quadraticCurveTo(W * 1.6, L * 0.5, W, 0);
+    s.lineTo(-W * 0.7, 0);
+    add(g, extrude(s, 0.008, 0.006), M.dark, 0, base, 0);
+    // faint teal cutting edge
+    const e = new THREE.Shape();
+    e.moveTo(W * 0.85, 0); e.quadraticCurveTo(W * 1.45, L * 0.5, W * 1.55, L * 0.97); e.quadraticCurveTo(W * 1.3, L * 0.5, W * 0.7, 0); e.lineTo(W * 0.85, 0);
+    add(g, extrude(e, 0.012, 0.002), M.teal, 0, base, 0);
+    add(g, new THREE.BoxGeometry(0.16, 0.03, 0.04), M.dark, 0, base - 0.01, 0);
+    add(g, new THREE.OctahedronGeometry(0.026), M.teal, 0, base - 0.01, 0.025);
+    top = base + L;
+  }
+  // grip + pommel
+  add(g, new THREE.CylinderGeometry(0.02, 0.022, 0.16, 10), M.leather, 0, -0.02, 0);
+  for (let i = 0; i < 4; i++) add(g, new THREE.TorusGeometry(0.022, 0.005, 5, 12), M.leather, 0, -0.08 + i * 0.04, 0, Math.PI / 2 + 0.25);
+  add(g, new THREE.SphereGeometry(0.03, 10, 8), style === 'saber' ? M.brass : style === 'fang' ? M.dark : M.iron, 0, -0.11, 0);
+  return { g, base, top };
+}
+
 // put a pair of blades into a rig's hand holders (right = glowR, left = glowL); returns { right, left }
 export function attachDualBlades(rig, look = {}) {
+  if (PROCEDURAL.includes(look.model)) {
+    const make = (color, mirror) => {
+      const { g, base, top } = buildTwinBlade(look.model);
+      g.name = 'dual-blade';
+      if (mirror) g.scale.x = -1;
+      g.userData.baseLocal = new THREE.Vector3(0, base + 0.04, 0);
+      g.userData.tipLocal = new THREE.Vector3(0, top - 0.02, 0);
+      g.userData.color = new THREE.Color(color);
+      return g;
+    };
+    const right = make(look.glowR || '#dfe6ee', false), left = make(look.glowL || '#dfe6ee', true);
+    if (rig.weaponHolder) rig.weaponHolder.add(right);
+    if (rig.weaponHolderL) rig.weaponHolderL.add(left);
+    return { right, left };
+  }
   const right = createDualBlade(look.glowR || '#ff2a3c', { phase: 0, model: look.model || 'robosword' });
   const left = createDualBlade(look.glowL || '#2a7bff', { mirror: true, phase: 2.1, model: look.model || 'robosword' });
   if (rig.weaponHolder) rig.weaponHolder.add(right);

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { G } from '../game/game.js';
 import { createFighter } from '../entities/fighter.js';
 import { applyPlayerTint } from '../entities/playerModel.js';
+import { applyOutfit } from '../entities/outfit.js';
 import { dualBladesReady, attachDualBlades, bladeTime } from '../entities/weapons.js';
 import { P_IDLE, P_DUAL_IDLE, P_SIT, fullPose, legIK } from '../entities/anim.js';
 import { JOINTS } from '../entities/humanoid.js';
@@ -324,6 +325,7 @@ function spawnHero(S, i, data) {
   const f = createFighter(tintOf(data.look));
   const rig = f.rig, anim = f.anim;
   const root = f.root;
+  applyOutfit(rig, data.equipment || STARTING.equipment, tintOf(data.look));   // visible armour on the terrace too
   const weaponId = (data.equipment && data.equipment.weapon) || STARTING.equipment.weapon;
   const dual = ITEMS[weaponId] && ITEMS[weaponId].weaponClass === 'dual';
   let blades = null;

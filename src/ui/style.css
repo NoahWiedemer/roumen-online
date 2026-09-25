@@ -298,6 +298,11 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 #travel-fade .tf-bar { width: 300px; height: 8px; border-radius: 4px; background: #0009; border: 1px solid #ffffff40; overflow: hidden; }
 #travel-fade .tf-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7affd6, #ffe07a); transition: width 0.2s; }
 
+/* interface hidden hint */
+#ui-toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 40; pointer-events: none; opacity: 0; transition: opacity 0.4s;
+  font: 800 14px Nunito, sans-serif; color: #fff; background: rgba(10, 14, 24, 0.7); padding: 8px 16px; border-radius: 18px; border: 1px solid #ffffff40; }
+#ui-toast.show { opacity: 1; }
+
 /* ------------------------------------------------------------------ title screen (Scamigo Online) */
 #scene-fade { position: fixed; inset: 0; z-index: 95; background: #05060b; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
 #scene-fade.on { opacity: 1; pointer-events: auto; }

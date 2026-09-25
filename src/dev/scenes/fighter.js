@@ -13,7 +13,7 @@ export default async function (ctx) {
   if (q.get('dual')) {
     await preloadDualBlades();
     if (f.rig.weapon) f.rig.weapon.visible = false;
-    attachDualBlades(f.rig, {});
+    attachDualBlades(f.rig, { model: q.get('blades') || 'robosword' });   // &blades=dagger|saber|fang
     f.anim.setStyle('dual');
     ctx.onUpdate((dt, t) => { bladeTime.value = t; });
   }

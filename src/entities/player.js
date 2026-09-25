@@ -6,6 +6,9 @@ import { dualBladesReady, attachDualBlades, bladeTime } from './weapons.js';
 import { createMount, MOUNTS } from './mounts.js';
 import { mocapReady, getMocap } from './mocap.js';
 import { CLIPS } from './anim.js';
+import { applyOutfit } from './outfit.js';
+
+const OUTFIT_SLOTS = ['armor', 'pants', 'boots', 'gloves'];
 import { G } from '../game/game.js';
 import { clamp, dampAngle, angleDiff, lerp } from '../core/utils.js';
 import {
@@ -80,7 +83,10 @@ export class Player {
     this.trail = new Trail(scene, '#fff4c8', 16);
     this.trailL = new Trail(scene, '#2a7bff', 16);
     this.applyWeaponLook();
+    this.applyOutfit();
   }
+  // equipped armour shows on the hero (see outfit.js)
+  applyOutfit() { applyOutfit(this.rig, this.equipment, tintOf(this.look)); }
   isDual() { return ITEMS[this.equipment.weapon]?.weaponClass === 'dual'; }
 
   // ---------------------------------------------------------------- stats
@@ -172,6 +178,7 @@ export class Player {
     this.inventory[i] = prev ? { id: prev, n: 1 } : null;
     this.recalc();
     if (slot === 'weapon') { this.applyWeaponLook(); if (this.mount) this.setWeaponsHidden(true); }
+    if (OUTFIT_SLOTS.includes(slot)) this.applyOutfit();
     G.audio.play('pickup');
     G.msg(`Equipped ${it.name}.`);
     G.emit('inventory');
@@ -185,6 +192,7 @@ export class Player {
     this.addItem(id, 1);
     this.recalc();
     if (slot === 'weapon') { this.applyWeaponLook(); if (this.mount) this.setWeaponsHidden(true); }
+    if (OUTFIT_SLOTS.includes(slot)) this.applyOutfit();
     G.emit('inventory');
   }
   applyWeaponLook() {
@@ -192,7 +200,10 @@ export class Player {
     const w = this.rig.weapon;
     // dual blades: one glowing blade per fist, own stance / run cycle / combo
     if (it && it.weaponClass === 'dual') {
-      if (!this.dual && dualBladesReady()) this.dual = attachDualBlades(this.rig, it.look);
+      // a different pair was equipped: swap the blade models
+      const wid = this.equipment.weapon;
+      if (this.dual && this.dualId !== wid) { this.dual.right.removeFromParent(); this.dual.left.removeFromParent(); this.dual = null; }
+      if (!this.dual && dualBladesReady(it.look.model || 'robosword')) { this.dual = attachDualBlades(this.rig, it.look); this.dualId = wid; }
       if (this.dual) this.dual.right.visible = this.dual.left.visible = true;
       if (w) w.visible = false;
       this.anim.setStyle('dual');

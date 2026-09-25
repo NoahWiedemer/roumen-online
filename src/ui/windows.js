@@ -443,6 +443,7 @@ export class Windows {
       const i = el('input', '', r); i.type = 'checkbox'; i.checked = val;
       i.onchange = () => fn(i.checked);
     };
+    check('Show interface (U)', !this.hud.hidden, (v) => this.hud.setHidden(!v));
     check('Shadows', o.shadows, (v) => { o.shadows = v; G.applyOptions(); });
     check('Bloom glow', o.bloom, (v) => { o.bloom = v; G.applyOptions(); });
     const r = el('div', 'opt-row', sec2, '<span>Resolution</span>');
@@ -464,6 +465,7 @@ export class Windows {
       <kbd>Right drag</kbd><span>Rotate camera</span>
       <kbd>Wheel / PgUp PgDn</kbd><span>Zoom</span>
       <kbd>Tab</kbd><span>Target next monster</span>
+      <kbd>U</kbd><span>Hide / show the interface</span>
       <kbd>1 – 0, - , =</kbd><span>Skill bar (hold Shift for 2nd bar)</span>
       <kbd>Q / E</kbd><span>Use HP / SP stone</span>
       <kbd>Space</kbd><span>Jump</span>
