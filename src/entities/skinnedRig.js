@@ -30,12 +30,14 @@ export async function loadSkinnedTemplate(spec) {
     rest[o.name] = { q: o.getWorldQuaternion(new THREE.Quaternion()), p: o.getWorldPosition(new THREE.Vector3()), pos: o.position.clone() };
   });
   for (const b of [...Object.values(spec.boneMap), spec.rootBone]) if (!rest[b]) throw new Error(`${spec.url}: bone ${b} missing`);
-  const down = new THREE.Vector3(0, -1, 0);
+  const down = new THREE.Vector3(0, -1, 0), up = new THREE.Vector3(0, 1, 0);
   const offset = {};
   for (const [joint, bone] of Object.entries(spec.boneMap)) {
     const c = new THREE.Quaternion();
     const end = spec.segmentEnd[joint];
+    const endUp = spec.segmentUp && spec.segmentUp[joint];   // torso segments straightened to point up
     if (end) c.setFromUnitVectors(rest[end].p.clone().sub(rest[bone].p).normalize(), down);
+    else if (endUp) c.setFromUnitVectors(rest[endUp].p.clone().sub(rest[bone].p).normalize(), up);
     offset[joint] = c.multiply(rest[bone].q);
   }
   if (spec.material) spec.material(skinned.material);

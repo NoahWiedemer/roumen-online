@@ -26,6 +26,7 @@ import { Player } from './entities/player.js';
 import { preloadPlayerModel } from './entities/playerModel.js';
 import { preloadNpcModels } from './entities/npcModels.js';
 import { preloadDualBlades } from './entities/weapons.js';
+import { preloadMocap } from './entities/mocap.js';
 import { MonsterManager } from './entities/monsters.js';
 import { NpcManager } from './entities/npcs.js';
 import { LootManager } from './entities/loot.js';
@@ -92,6 +93,7 @@ async function init() {
   if (MonsterModels.preloadMonsterAssets) { try { await MonsterModels.preloadMonsterAssets(); } catch (e) { console.warn('monster assets', e); } }
   try { await preloadPlayerModel(); } catch (e) { console.warn('player model (falling back to the procedural fighter)', e); }
   try { await preloadDualBlades(); } catch (e) { console.warn('dual blades model', e); }
+  try { await preloadMocap(); } catch (e) { console.warn('motion clips (falling back to procedural locomotion)', e); }
 
   const roumen = await buildRoumen(engine, assets);
   registerWorld(roumen);

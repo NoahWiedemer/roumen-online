@@ -138,8 +138,10 @@ const DUAL_RUN = {
   armR: [0.5, 0.1, -0.22], elbowR: [-0.2, 0, 0], handR: [1.95, 0.1, -0.15],
   armL: [-0.3, 0, 0.15], elbowL: [-1.6, -1.1, 0], handL: [-1.6, 0, 0],   // forearm across the chest, reverse grip
 };
+const ARM_CH = ['armL', 'elbowL', 'handL', 'armR', 'elbowR', 'handR'];
+const pick = (p, chans) => Object.fromEntries(chans.map((c) => [c, p[c]]));
 // sword run: right arm swept back, blade trailing behind and a little up
-const SWORD_RUN = { armR: [0.4, 0.1, -0.35], elbowR: [-0.35, 0, 0], handR: [2.3, 0, -0.35] };
+const SWORD_RUN ={ armR: [0.4, 0.1, -0.35], elbowR: [-0.35, 0, 0], handR: [2.3, 0, -0.35] };
 
 // ---- gait helpers (skinned rigs with rig.legGeo)
 // foot path of one leg over the gait cycle u (0 = touch-down in front); z in model units (travel / zc), y in leg
@@ -190,6 +192,34 @@ export function fullPose(p) {
   return p;
 }
 fullPose(P_IDLE); fullPose(P_BATTLE); fullPose(P_SIT); fullPose(P_RIDE); fullPose(P_DEAD); fullPose(P_DUAL_IDLE); fullPose(P_DUAL_BATTLE);
+
+// weapon-holding arm layers for the motion-capture locomotion (joint -> rotation; absent joints keep the clip).
+// `aim`: while moving, the hand's orientation relative to the chest is locked to the one of a designed pose
+// (arm * elbow * hand of that pose), so the weapon keeps its look while the arm swings naturally.
+const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
+const _eu = new THREE.Euler(0, 0, 0, 'YXZ');
+const _aimOut = { L: null, R: null };
+function eulerQ(r, out) { return out.setFromEuler(_eu.set(r[0], r[1], r[2], 'YXZ')); }
+function chainQ(p, side) {
+  const q = new THREE.Quaternion();
+  eulerQ(p['arm' + side], q); q.multiply(eulerQ(p['elbow' + side], _qc)); q.multiply(eulerQ(p['hand' + side], _qc));
+  return q;
+}
+const WEAPON_ARMS = {
+  // big sword: resting on the right shoulder when standing and while running
+  sword: {
+    idle: pick(P_IDLE, ['armR', 'elbowR', 'handR']),
+    run: { armR: [-0.3, 0.2, -0.45], elbowR: [-2.1, 0, 0], handR: [-0.5, -0.68, 0.3] },
+  },
+  // dual blades: a relaxed V when standing; running keeps the natural arm swing with the blades reverse-gripped
+  dual: {
+    idle: pick(P_DUAL_IDLE, ['armL', 'elbowL', 'handL', 'armR', 'elbowR', 'handR']),
+    // arms halfway between the clip's swing and the designed run pose (less swing: the blades stay clear)
+    run: pick(DUAL_RUN, ['armL', 'elbowL', 'armR', 'elbowR']),
+    runWeight: 0.5,
+    aim: { L: chainQ(DUAL_RUN, 'L'), R: chainQ({ ...DUAL_RUN, handR: [1.55, 0.1, -0.5] }, 'R') },
+  },
+};
 
 // Re-base a clip for another weapon style: every channel that was taken verbatim from a library pose
 // (e.g. `...P_BATTLE`) is swapped for the matching channel of the style's pose. Hit reactions, pick-up,
@@ -477,6 +507,9 @@ export const CLIPS = {
   }),
 };
 
+// generic clip names replaced by motion-capture clips on rigs that have them
+const MOCAP_ALIAS = { hit: 'mc_Hit_Chest' };
+
 // ------------------------------------------------------------------ animator
 export class Animator {
   constructor(rig, { idlePose = P_IDLE, gait = 'sword' } = {}) {
@@ -524,17 +557,104 @@ export class Animator {
   }
 
   play(name, { speed = 1, onEvent = null, fadeIn = 0.06, fadeOut = 0.16 } = {}) {
+    if (this.mocap && MOCAP_ALIAS[name] && CLIPS[MOCAP_ALIAS[name]]) name = MOCAP_ALIAS[name];
     let clip = CLIPS[name];
     if (!clip) return null;
-    if (this.style !== 'sword' && STYLE_POSES[this.style] && !name.startsWith(this.style + '_')) clip = restyleClip(clip, this.style);
+    if (this.style !== 'sword' && STYLE_POSES[this.style] && !name.startsWith(this.style + '_') && !name.startsWith('mc_')) clip = restyleClip(clip, this.style);
     this.action = { clip, t: 0, speed, weight: this.action ? this.action.weight : 0, fadeIn, fadeOut, onEvent, fired: new Set(), done: false };
     return this.action;
   }
   get busy() { return !!(this.action && !this.action.done && this.action.t < this.action.clip.duration - this.action.fadeOut * 0.5); }
   stop() { if (this.action) this.action.done = true; }
 
-  die() { this.dead = true; this.play('death'); }
+  die() { this.dead = true; this.play(this.mocap && CLIPS.mc_Death01 ? 'mc_Death01' : 'death'); }
   revive() { this.dead = false; this.action = null; }
+
+  // ---------------------------------------------------------------- motion-capture locomotion
+  // Rigs given a clip library (see mocap.js) stand, walk and run with real motion clips: idle / fight stance,
+  // walk <-> jog blended by speed with a shared, phase-locked cycle whose playback rate follows the ground
+  // speed (planted feet do not slide). Weapon holding arms are layered on top of the mocap body.
+  useMocap(lib) {
+    this.mocap = lib;
+    this.mc = { idleT: Math.random() * 2, phase: 0, airT: 0 };
+    this.mcA = emptyPose(); this.mcB = emptyPose(); this.mcW = emptyPose();
+  }
+  armStyle() {
+    if (this.gait === 'free') return null;
+    if (this.style === 'dual') return 'dual';
+    return this.rig.weapon && this.rig.weapon.visible ? 'sword' : null;
+  }
+  mocapLocomotion(dt) {
+    const J = this.base, C = this.mocap.clips, M = this.mocap.meta;
+    const A = this.mcA, B = this.mcB, W = this.mcW;
+    const s = this.speed, sc = this.rig.scale || 1;
+    const G = this.rig.legGeo;
+    const legW = (G ? G.thigh + G.shin : 0.75) * sc;
+    const v = this.groundSpeed ?? s * 6.2;
+    if (v > 0.3) this.gaitSpeed = v;
+    const gv = this.gaitSpeed;
+    // standing: relaxed idle, crossfading into a ready fight stance in combat
+    this.mc.idleT += dt;
+    C.Idle_Loop.sample(this.mc.idleT % C.Idle_Loop.duration, J);
+    if (this.battle > 0.01 && C.Sword_Idle) { C.Sword_Idle.sample(this.mc.idleT % C.Sword_Idle.duration, A); blendPose(J, A, this.battle, J); }
+    // moving: walk <-> jog
+    const walk = C.Walk_Loop, run = C.Jog_Fwd_Loop, mw = M.Walk_Loop, mr = M.Jog_Fwd_Loop;
+    const natW = Math.max(0.3, mw.speedLeg * legW), natR = Math.max(1, mr.speedLeg * legW);
+    const k = clamp((gv - natW * 1.15) / (natR * 0.7 - natW * 1.15), 0, 1);
+    const rateW = clamp(gv / natW, 0.6, 1.9), rateR = clamp(gv / natR, 0.7, 1.6);
+    const f = lerp(rateW / walk.duration, rateR / run.duration, k);   // gait cycles per second
+    if (v > 0.05 && s > 0.01) this.mc.phase += dt * f * (this.moveDir < 0 ? -0.8 : 1);
+    const ph = ((this.mc.phase % 1) + 1) % 1;
+    walk.sample(((ph + mw.contact) % 1) * walk.duration, A);
+    run.sample(((ph + mr.contact) % 1) * run.duration, B);
+    blendPose(A, B, k, W);
+    const w = Math.min(1, s * 3.4);
+    blendPose(J, W, w, J);
+    // lean into turns
+    const ln = this.lean * s;
+    J.hips[2] -= ln * 0.4; J.spine[2] -= ln * 0.3; J.head[2] += ln * 0.25;
+    // airborne: mid-air pose from the jump clip
+    if (this.air > 0.001 && C.Jump_Loop) {
+      this.mc.airT += dt;
+      C.Jump_Loop.sample((0.35 + this.mc.airT * 0.7) % C.Jump_Loop.duration, A);
+      blendPose(J, A, this.air * 0.85, J);
+    } else this.mc.airT = 0;
+    // weapon arms layered on the mocap body: channels a style defines replace the clip's, the others keep the
+    // natural mocap arm swing (dual blades: arms swing, hands hold the blades in reverse grip along the forearms)
+    const arms = this.armStyle();
+    if (arms) {
+      const set = WEAPON_ARMS[arms];
+      const run = this.runOverride ? { ...set.run, ...this.runOverride } : set.run;
+      const rw = set.runWeight ?? 1;
+      // arms first (clip swing, partly pulled towards the style's run pose), then the hands
+      for (const pass of [0, 1]) {
+        for (const ch of ARM_CH) {
+          const isHand = ch.startsWith('hand');
+          if (isHand !== (pass === 1)) continue;
+          const side = ch.slice(-1);
+          const aimed = isHand && set.aim && set.aim[side];
+          if (aimed && w > 0.001) {
+            // the weapon keeps its orientation relative to the chest: hand = (arm * elbow)^-1 * aim
+            eulerQ(J['arm' + side], _qa); eulerQ(J['elbow' + side], _qb);
+            _qa.multiply(_qb).invert().multiply(set.aim[side]);
+            _eu.setFromQuaternion(_qa, 'YXZ');
+            _aimOut[side] = [_eu.x, _eu.y, _eu.z];
+          }
+          const idleC = set.idle[ch];
+          const runC = aimed ? _aimOut[side] : run[ch];
+          const k = aimed ? 1 : rw;
+          if (!idleC && !runC) continue;
+          const o = J[ch];
+          for (let i = 0; i < 3; i++) {
+            const m = o[i];
+            const a = idleC ? lerp(idleC[i], this.battlePose[ch][i], this.battle) : m;
+            o[i] = lerp(a, runC ? lerp(m, runC[i], k) : m, w);
+          }
+        }
+      }
+    }
+    this.finishPose(J, dt);
+  }
 
   // procedural locomotion pose into this.base
   locomotion(dt) {
@@ -686,6 +806,10 @@ export class Animator {
         a[0] += (b[0] - a[0]) * k; a[1] += (b[1] - a[1]) * k; a[2] += (b[2] - a[2]) * k;
       }
     }
+    this.finishPose(J, dt);
+  }
+  // shared tail of both locomotion paths: landing squash, sitting and riding
+  finishPose(J, dt) {
     if (this.landT > 0) {
       const b = Math.sin((1 - this.landT / 0.22) * Math.PI) * this.landK;
       J.pos[1] -= 0.07 * b; J.kneeL[0] += 0.45 * b; J.kneeR[0] += 0.45 * b; J.legL[0] -= 0.22 * b; J.legR[0] -= 0.22 * b; J.spine[0] += 0.12 * b;
@@ -695,7 +819,7 @@ export class Animator {
     if (this.sit > 0.001) blendPose(J, P_SIT, this.sit, J);
     if (this.ride > 0.001) {
       blendPose(J, P_RIDE, this.ride, J);
-      J.spine[0] += Math.sin(t * 2.1) * 0.012 * this.ride;
+      J.spine[0] += Math.sin(this.t * 2.1) * 0.012 * this.ride;
     }
   }
   // controller hooks: airborne state / landing impact
@@ -711,7 +835,7 @@ export class Animator {
     this.sit += (this.sitTarget - this.sit) * (1 - Math.exp(-5 * dt));
     this.ride += (this.rideTarget - this.ride) * (1 - Math.exp(-12 * dt));
     this.air += ((this.inAir ? 1 : 0) - this.air) * (1 - Math.exp(-(this.inAir ? 12 : 20) * dt));
-    this.locomotion(dt);
+    if (this.mocap) this.mocapLocomotion(dt); else this.locomotion(dt);
 
     let pose = this.base;
     const a = this.action;

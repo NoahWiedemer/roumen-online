@@ -7,10 +7,12 @@ import { preloadDualBlades, attachDualBlades, bladeTime } from '../../entities/w
 import { preloadNpcModel, createNpcRig } from '../../entities/npcModels.js';
 import { Animator } from '../../entities/anim.js';
 import { P_RATMOB } from '../../entities/monsters/skinned.js';
+import { preloadMocap } from '../../entities/mocap.js';
 
 export default async function (ctx) {
   const { scene, q } = ctx;
   await preloadPlayerModel();
+  const mocap = q.has('mocap') ? await preloadMocap() : null;
   const dual = !!q.get('dual');
   if (dual) await preloadDualBlades();
   let items = (q.get('items') || 'idle,run@0,run@0.25,run@0.5,run@0.75').split(',');
@@ -31,6 +33,7 @@ export default async function (ctx) {
       const rig = createNpcRig(npcId, {});
       f = { rig, root: rig.root, anim: new Animator(rig, { gait: 'free', idlePose: npcId === 'ratman_mob' ? P_RATMOB : undefined }) };
     } else f = createFighter();
+    if (mocap) f.anim.useMocap(mocap);
     if (ovs) f.anim.runOverride = ovs[i];
     if (dual) {
       if (f.rig.weapon) f.rig.weapon.visible = false;
@@ -49,6 +52,7 @@ export default async function (ctx) {
       a.groundSpeed = Number(q.get('v')) || (kind === 'run' ? 6.2 : 2.4);
       for (let k = 0; k < 20; k++) a.update(0.01, f.root.position);
       a.phase = Number(arg || 0) * Math.PI * 2;
+      if (a.mc) a.mc.phase = Number(arg || 0);
       a.groundSpeed = 0;
       a.update(0, f.root.position);
     } else if (kind.startsWith('clip:')) {

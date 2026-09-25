@@ -20,6 +20,9 @@ const SPEC = {
     armL: 'Bone_021', elbowL: 'Bone_020', handL: 'Bone_019', armR: 'Bone_026', elbowR: 'Bone_025', handR: 'Bone_024',
     legL: 'Bone_014', kneeL: 'Bone_013', legR: 'Bone_009', kneeR: 'Bone_008',
   },
+  // torso segments straightened to point up in the zero pose (the model's rest spine leans back ~15 degrees;
+  // mocap clips are retargeted by segment direction, so both rigs must share an upright zero pose)
+  segmentUp: { hips: 'Bone_005', spine: 'Bone_004', chest: 'Bone_002', neck: 'Bone_017' },
   material(mat) {
     mat.metalnessMap = null; mat.metalness = 0;   // the baked metal map only adds speckles
     mat.roughness = 0.78;

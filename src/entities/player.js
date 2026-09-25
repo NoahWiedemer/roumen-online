@@ -4,6 +4,8 @@ import { createFighter } from './fighter.js';
 import { Trail } from './effects.js';
 import { dualBladesReady, attachDualBlades, bladeTime } from './weapons.js';
 import { createMount, MOUNTS } from './mounts.js';
+import { mocapReady, getMocap } from './mocap.js';
+import { CLIPS } from './anim.js';
 import { G } from '../game/game.js';
 import { clamp, dampAngle, angleDiff, lerp } from '../core/utils.js';
 import {
@@ -19,6 +21,8 @@ export class Player {
   constructor(name = 'Ryou', look = {}, slot = 0) {
     const f = createFighter(tintOf(look));
     this.rig = f.rig; this.anim = f.anim; this.root = f.root;
+    // skinned hero: stand / walk / run / jump with the motion-capture clips
+    if (mocapReady() && this.rig.legGeo) this.anim.useMocap(getMocap());
     this.name = name;
     this.look = { hair: look.hair || null, outfit: look.outfit || null };
     this.slot = slot;          // character-select seat this hero is saved in
@@ -819,15 +823,17 @@ export class Player {
     // sword: 3-hit combo; dual blades: faster 4-hit combo (hits 3 and 4 strike twice for a bit less each)
     const n = dual ? 4 : 3;
     this.comboIdx = (this.comboIdx % n) + 1;
-    const clip = (dual ? 'dual_attack' : 'attack') + this.comboIdx;
-    const perHit = dual ? (this.comboIdx >= 3 ? 0.62 : 0.85) : 1;
+    // dual blades with motion clips: left stab, right stab, big right slash, big left slash (one hit each)
+    const mc = dual && this.anim.mocap && CLIPS['mc_dual_' + this.comboIdx] ? 'mc_dual_' + this.comboIdx : null;
+    const clip = mc || (dual ? 'dual_attack' : 'attack') + this.comboIdx;
+    const perHit = dual ? (this.comboIdx >= 3 ? (mc ? 1.2 : 0.62) : 0.85) : 1;
     this.attackTimer = dual ? [0, 0.44, 0.44, 0.6, 0.8][this.comboIdx] - Math.min(0.12, this.stats.aim * 0.002) : 1.05 - Math.min(0.3, this.stats.aim * 0.004);
     this.inCombatT = 6;
     this.anim.battleTarget = 1;
     this.swingColor = null;
     G.audio.play(dual && this.comboIdx === 4 ? 'swingBig' : 'swing');
     this.anim.play(clip, {
-      speed: dual ? 1.05 : 1.1,
+      speed: mc ? 1 : dual ? 1.05 : 1.1,
       onEvent: (ev) => {
         if (ev === 'hit' && t && !t.dead) {
           const d = Math.hypot(t.pos.x - this.pos.x, t.pos.z - this.pos.z);
