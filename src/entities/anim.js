@@ -155,7 +155,7 @@ function footPath(u, D, travel, zc, lift, dir, out) {
 }
 // 2-bone IK in the sagittal plane: ankle target (z forward, y up) relative to the hip joint -> [hip, knee]
 // (hip negative = thigh forward, knee positive = bent, knee always in front)
-function legIK(z, y, T, S, out) {
+export function legIK(z, y, T, S, out = [0, 0]) {
   let d = Math.hypot(z, y);
   const maxD = (T + S) * 0.998;
   if (d > maxD) { z *= maxD / d; y *= maxD / d; d = maxD; }

@@ -100,6 +100,23 @@ function fader() {
   document.body.appendChild(overlay);
   return overlay;
 }
+// the same black curtain for other long switches (character select -> game)
+export const curtain = {
+  show(title = '') {
+    const o = fader();
+    o.querySelector('.tf-name').textContent = title;
+    o.querySelector('.tf-text').textContent = '';
+    o.querySelector('.tf-bar i').style.width = '0%';
+    o.classList.add('show');
+  },
+  async progress(pct, text) {
+    const o = fader();
+    o.querySelector('.tf-text').textContent = text;
+    o.querySelector('.tf-bar i').style.width = pct + '%';
+    await frame();
+  },
+  hide() { if (overlay) overlay.classList.remove('show'); },
+};
 // yield so the overlay can paint (the timeout fallback keeps going in hidden tabs, where rAF never fires)
 const frame = () => new Promise((r) => { let done = false; const fin = () => { if (!done) { done = true; r(); } }; requestAnimationFrame(() => setTimeout(fin, 0)); setTimeout(fin, 60); });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

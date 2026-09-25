@@ -9,16 +9,18 @@ import {
   EXP_TABLE, MAX_LEVEL, FIGHTER_BASE, FIGHTER_GROWTH, STAT_NAMES, derivedStats, SKILLS, ITEMS, STARTING, EQUIP_SLOTS,
 } from '../game/data.js';
 import { TOWN } from '../world/layout.js';
+import { saveSlot, tintOf } from '../game/saves.js';
 
 const RUN_SPEED = 6.2, WALK_SPEED = 2.4, GCD = 0.6;
 const INV_SIZE = 48; // 2 pages x 24
-const SAVE_KEY = 'roumen-online-save-v1';
 
 export class Player {
-  constructor(name = 'Ryou') {
-    const f = createFighter();
+  constructor(name = 'Ryou', look = {}, slot = 0) {
+    const f = createFighter(tintOf(look));
     this.rig = f.rig; this.anim = f.anim; this.root = f.root;
     this.name = name;
+    this.look = { hair: look.hair || null, outfit: look.outfit || null };
+    this.slot = slot;          // character-select seat this hero is saved in
     this.title = 'Novice';
     this.isPlayer = true;
     this.radius = 0.4;
@@ -798,15 +800,14 @@ export class Player {
         name: this.name, level: this.level, exp: this.exp, statPoints: this.statPoints, alloc: this.alloc, money: this.money,
         stones: this.stones, inventory: this.inventory, equipment: this.equipment, learned: [...this.learned], skillbar: this.skillbar,
         hp: this.hp, sp: this.sp, pos: [this.pos.x, this.pos.z], quests: G.quests ? G.quests.serialize() : null, title: this.title,
-        world: G.world ? G.world.id : 'roumen', rotY: this.rotY, flags: this.flags,
+        world: G.world ? G.world.id : 'roumen', rotY: this.rotY, flags: this.flags, look: this.look,
       };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      saveSlot(this.slot, data);
     } catch { /* storage unavailable */ }
   }
-  load() {
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch { data = null; }
-    if (!data) return false;
+  // restore from a slot's save data; false = a new hero (no data, or created on the terrace and never played)
+  load(data) {
+    if (!data || data.fresh) return false;
     Object.assign(this, {
       name: data.name || this.name, level: data.level, exp: data.exp, statPoints: data.statPoints, alloc: data.alloc, money: data.money,
       stones: data.stones, inventory: data.inventory, equipment: data.equipment, skillbar: data.skillbar, title: data.title || this.title,
@@ -822,5 +823,4 @@ export class Player {
     this._savedQuests = data.quests;
     return true;
   }
-  static clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ } }
 }

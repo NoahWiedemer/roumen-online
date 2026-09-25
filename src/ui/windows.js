@@ -450,8 +450,8 @@ export class Windows {
     el('h4', '', sec3, 'Game');
     const b1 = el('button', 'btn', sec3, 'Save now'); b1.onclick = () => { G.player.save(); G.msg('Game saved.'); };
     b1.style.marginRight = '6px';
-    const b2 = el('button', 'btn orange', sec3, 'Reset character');
-    b2.onclick = () => { if (confirm('Delete your character and start over?')) { G.resetSave(); } };
+    const b2 = el('button', 'btn orange', sec3, 'Character select');
+    b2.onclick = () => G.toCharSelect();
   }
   render_help(body) {
     body.innerHTML = `<div class="keys">

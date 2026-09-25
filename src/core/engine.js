@@ -104,4 +104,13 @@ export class Engine {
     if (this.useBloom) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }
+
+  // render another scene through the same post chain (title screen, character select)
+  renderWith(scene, camera) {
+    const s = this.renderPass.scene, c = this.renderPass.camera;
+    this.renderPass.scene = scene; this.renderPass.camera = camera;
+    if (this.useBloom) this.composer.render();
+    else this.renderer.render(scene, camera);
+    this.renderPass.scene = s; this.renderPass.camera = c;
+  }
 }

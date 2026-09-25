@@ -297,3 +297,80 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 #travel-fade .tf-text { font: 800 13px Nunito, sans-serif; color: #bfe8e0; min-height: 18px; }
 #travel-fade .tf-bar { width: 300px; height: 8px; border-radius: 4px; background: #0009; border: 1px solid #ffffff40; overflow: hidden; }
 #travel-fade .tf-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7affd6, #ffe07a); transition: width 0.2s; }
+
+/* ------------------------------------------------------------------ title screen (Scamigo Online) */
+#scene-fade { position: fixed; inset: 0; z-index: 95; background: #05060b; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+#scene-fade.on { opacity: 1; pointer-events: auto; }
+#title-ui { position: fixed; inset: 0; z-index: 30; pointer-events: none; font-family: Nunito, sans-serif; }
+#title-ui .ttl-logo { position: absolute; left: 50%; top: 3vh; width: min(640px, 72vw, 85vh); transform: translateX(-50%); opacity: 0;
+  filter: drop-shadow(0 6px 0 rgba(40, 10, 0, 0.35)) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); }
+#title-ui .ttl-logo svg { display: block; width: 100%; height: auto; overflow: visible; }
+#title-ui .ttl-logo.burn, #title-ui .ttl-logo.shown { opacity: 1; }
+#title-ui .ttl-logo.burn { -webkit-mask-image: linear-gradient(90deg, #000 42%, transparent 58%); mask-image: linear-gradient(90deg, #000 42%, transparent 58%);
+  -webkit-mask-size: 300% 100%; mask-size: 300% 100%; -webkit-mask-position: 0 0; mask-position: 0 0;
+  animation: ttl-burn 0.95s cubic-bezier(.3,.6,.4,1) both, ttl-glow 1.8s ease-out both; }
+#title-ui .ttl-logo.shown:not(.burn) { -webkit-mask-image: none; mask-image: none; }
+@keyframes ttl-burn { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
+@keyframes ttl-glow {
+  0% { filter: brightness(2.2) drop-shadow(0 0 28px #ff7a1a) drop-shadow(0 0 60px #ff3c00); }
+  60% { filter: brightness(1.25) drop-shadow(0 0 14px #ffb347) drop-shadow(0 10px 24px rgba(0,0,0,.45)); }
+  100% { filter: drop-shadow(0 6px 0 rgba(40, 10, 0, 0.35)) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45)); } }
+#title-ui .ttl-shine { animation: ttl-shine 5s ease-in-out 1.5s infinite; }
+@keyframes ttl-shine { 0%, 70% { opacity: 0; } 80% { opacity: 0.55; } 100% { opacity: 0; } }
+#title-ui .ttl-bottom { position: absolute; left: 50%; bottom: 7vh; transform: translate(-50%, 20px); text-align: center; opacity: 0; transition: opacity 0.5s, transform 0.5s; }
+#title-ui .ttl-bottom.shown { opacity: 1; transform: translate(-50%, 0); }
+#title-ui .ttl-bottom.shown .ttl-start { pointer-events: auto; }
+#title-ui .ttl-start { position: relative; font: 900 26px 'Lilita One', Nunito, sans-serif; letter-spacing: 6px; text-transform: uppercase; color: #fff4d0; cursor: pointer;
+  padding: 14px 64px 12px; border-radius: 40px; border: 3px solid #ffd978; background: linear-gradient(#b3342c, #6d1119);
+  box-shadow: 0 0 0 3px #3b0d0e, 0 6px 0 #3b0d0e, 0 10px 26px rgba(0, 0, 0, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  text-shadow: 0 2px 0 #3b0d0e; animation: ttl-pulse 2.2s ease-in-out infinite; }
+#title-ui .ttl-start:hover { filter: brightness(1.15); transform: translateY(-1px); }
+#title-ui .ttl-start:active { transform: translateY(2px); }
+@keyframes ttl-pulse { 0%, 100% { box-shadow: 0 0 0 3px #3b0d0e, 0 6px 0 #3b0d0e, 0 10px 26px rgba(0,0,0,.5), 0 0 0 rgba(255,200,90,0); }
+  50% { box-shadow: 0 0 0 3px #3b0d0e, 0 6px 0 #3b0d0e, 0 10px 26px rgba(0,0,0,.5), 0 0 30px rgba(255,190,80,.75); } }
+#title-ui .ttl-hint { margin-top: 12px; font-weight: 800; font-size: 13px; color: #fff3e6; text-shadow: 0 1px 3px #000c; opacity: 0.85; }
+#title-ui .ttl-foot { position: absolute; right: 14px; bottom: 10px; font-weight: 700; font-size: 11px; color: #ffffffa0; text-shadow: 0 1px 2px #000a; }
+#title-ui.leaving .ttl-bottom, #select-ui.leaving > * { opacity: 0; transition: opacity 0.3s; }
+
+/* ------------------------------------------------------------------ character select terrace */
+#select-ui { position: fixed; inset: 0; z-index: 30; pointer-events: none; font-family: Nunito, sans-serif; color: #fff; }
+#select-ui .cs-top { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); text-align: center; }
+#select-ui .cs-logo { width: 250px; margin: 0 auto; filter: drop-shadow(0 4px 10px rgba(0,0,0,.45)); }
+#select-ui .cs-logo svg { width: 100%; height: auto; display: block; }
+#select-ui .cs-title { font: 400 20px 'Lilita One', Nunito, sans-serif; letter-spacing: 3px; color: #fff4dc; text-shadow: 0 2px 0 #3b1a10, 0 0 16px rgba(0,0,0,.4); margin-top: -4px; }
+#select-ui .cs-panel, #select-ui .cs-create { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); pointer-events: auto; text-align: center;
+  min-width: 360px; padding: 14px 22px 16px; border-radius: 16px; background: linear-gradient(rgba(38, 24, 48, 0.86), rgba(20, 12, 28, 0.92));
+  border: 2px solid #d9b56a; box-shadow: 0 0 0 2px #2a1410, 0 12px 30px rgba(0,0,0,.45); }
+#select-ui .cs-create { display: none; bottom: auto; top: 50%; left: auto; right: 4vw; transform: translateY(-50%); min-width: 300px; text-align: left; }
+#select-ui .cs-create.shown { display: block; }
+#select-ui .cs-create.left { right: auto; left: 4vw; }
+#select-ui .cs-name { font: 400 26px 'Lilita One', Nunito, sans-serif; letter-spacing: 1px; color: #ffe7a8; text-shadow: 0 2px 0 #2a1410; }
+#select-ui .cs-sub { font-weight: 700; font-size: 13px; color: #e6dcff; opacity: 0.9; margin-top: 2px; }
+#select-ui .cs-empty { font-weight: 800; color: #e6dcff; }
+#select-ui .cs-btns { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+#select-ui .cs-btn { font: 900 15px Nunito, sans-serif; padding: 9px 20px; border-radius: 22px; border: 2px solid #cfc3ea; background: linear-gradient(#5b4a7c, #33284a); color: #fff; cursor: pointer;
+  box-shadow: 0 3px 0 #1a1226; }
+#select-ui .cs-btn.gold { border-color: #ffe39a; background: linear-gradient(#ffc75a, #e07b16); color: #3b1a05; box-shadow: 0 3px 0 #7a3a08, 0 0 18px rgba(255,190,80,.35); padding: 9px 30px; }
+#select-ui .cs-btn.red { border-color: #ffb1a8; background: linear-gradient(#c8453e, #7c1c1c); }
+#select-ui .cs-btn:hover { filter: brightness(1.12); }
+#select-ui .cs-btn:active { transform: translateY(2px); }
+#select-ui .cs-create label { display: block; font-weight: 800; font-size: 13px; color: #e6dcff; margin-top: 10px; }
+#select-ui .cs-create input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font: 800 17px Nunito; padding: 7px 12px; border-radius: 10px;
+  border: 2px solid #cfc3ea; background: rgba(0,0,0,.35); color: #fff; outline: none; }
+#select-ui .cs-create input:focus { border-color: #ffe39a; }
+#select-ui .cs-create input.err { border-color: #ff5a5a; animation: cs-shake 0.3s; }
+@keyframes cs-shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+#select-ui .cs-lbl { font-weight: 800; font-size: 13px; color: #e6dcff; margin: 10px 0 5px; }
+#select-ui .cs-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+#select-ui .cs-sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #ffffff60; cursor: pointer; padding: 0; box-shadow: 0 2px 0 #0006; }
+#select-ui .cs-sw.on { border-color: #ffe39a; box-shadow: 0 0 0 2px #ffe39a, 0 0 12px #ffe39a; }
+#select-ui .cs-panel, #select-ui .cs-create { z-index: 2; }
+#select-ui .cs-tag { position: absolute; left: 0; top: 0; z-index: 1; text-align: center; white-space: nowrap; pointer-events: none; transition: opacity 0.2s; opacity: 0.85; }
+#select-ui .cs-tag b { display: block; font: 400 17px 'Lilita One', Nunito, sans-serif; letter-spacing: 1px; color: #fff; text-shadow: 0 2px 0 #1a1020, 0 0 8px #000a; }
+#select-ui .cs-tag i { display: block; font-style: normal; font-weight: 800; font-size: 11px; color: #ffe7a8; text-shadow: 0 1px 2px #000; }
+#select-ui .cs-tag.sel { opacity: 1; }
+#select-ui .cs-tag.sel b { color: #ffe39a; font-size: 20px; }
+#select-ui .cs-tag.empty { opacity: 0; }
+#select-ui .cs-tag.empty.hov, #select-ui .cs-tag.empty.sel { opacity: 1; }
+#select-ui .cs-tag b.plus { font-size: 0; height: 0; }
+#select-ui .cs-help { position: absolute; left: 14px; bottom: 12px; font-weight: 700; font-size: 12px; color: #ffffffb0; text-shadow: 0 1px 2px #000; }

@@ -84,6 +84,12 @@ export class Audio {
       case 'jump': this.tone(300, 0.15, { type: 'sine', vol: 0.12, slide: 1.8 }); break;
       case 'buzz': this.tone(180 + Math.random() * 40, 0.3, { type: 'sawtooth', vol: 0.03 }); break;
       case 'teleport': this.tone(300, 0.8, { type: 'sine', vol: 0.15, slide: 4 }); this.noiseBurst(0.8, { vol: 0.08, freq: 2000, q: 2, slide: 3 }); break;
+      // title intro
+      case 'roar': this.tone(95, 1.1, { type: 'sawtooth', vol: 0.22, attack: 0.08, slide: 0.55 }); this.tone(140, 0.9, { type: 'square', vol: 0.08, attack: 0.1, slide: 0.6 }); this.noiseBurst(1.1, { vol: 0.3, freq: 420, q: 0.7, slide: 0.5 }); break;
+      case 'fire': this.noiseBurst(1.3, { vol: 0.35, freq: 900, q: 0.5, type: 'lowpass', slide: 0.4 }); this.noiseBurst(1.0, { vol: 0.15, freq: 2600, q: 1.2, slide: 0.5, delay: 0.1 }); break;
+      case 'meow': this.tone(620, 0.35, { type: 'triangle', vol: 0.1, slide: 1.4 }); this.tone(860, 0.25, { type: 'triangle', vol: 0.08, slide: 0.7, delay: 0.18 }); break;
+      case 'poof': this.noiseBurst(0.5, { vol: 0.3, freq: 1400, q: 0.6, slide: 0.3 }); this.tone(240, 0.25, { type: 'sine', vol: 0.12, slide: 0.5 }); break;
+      case 'glint': [1760, 2637, 3520].forEach((f, i) => this.tone(f, 0.25, { type: 'sine', vol: 0.06, delay: i * 0.05 })); break;
     }
   }
 

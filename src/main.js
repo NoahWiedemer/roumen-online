@@ -15,7 +15,12 @@ import * as MonsterModels from './entities/monsterModels.js';
 import { createWorldContext } from './world/worldctx.js';
 import { buildVegetation } from './world/vegetation.js';
 import { NavGrid } from './world/colliders.js';
-import { registerWorld, registerBuilder, captureAtmosphere, restoreAtmosphere, getWorld, enterWorld, travel, addPortalBlockers } from './world/worlds.js';
+import { registerWorld, registerBuilder, captureAtmosphere, restoreAtmosphere, getWorld, enterWorld, travel, addPortalBlockers, curtain } from './world/worlds.js';
+import { initSlots, loadSlot, getActiveSlot, setActiveSlot, WORLD_NAMES } from './game/saves.js';
+import { fadeScreen } from './title/ui.js';
+import { preloadReko } from './title/reko.js';
+import { runTitle } from './title/titleScreen.js';
+import { runCharSelect } from './title/charSelect.js';
 import { Effects } from './entities/effects.js';
 import { Player } from './entities/player.js';
 import { preloadPlayerModel } from './entities/playerModel.js';
@@ -61,7 +66,15 @@ G.applyOptions = () => {
   }
   G.saveOptions();
 };
-G.resetSave = () => { Player.clearSave(); location.reload(); };
+// back to the character-select terrace (saves, then reloads straight into the selection without the intro)
+const SKIP_INTRO_KEY = 'scamigo-skip-intro';
+G.toCharSelect = () => {
+  if (G.player) G.player.save();
+  try { sessionStorage.setItem(SKIP_INTRO_KEY, '1'); } catch { /* ignore */ }
+  const q = new URLSearchParams(location.search);
+  q.delete('autostart');
+  location.search = q.toString();
+};
 
 async function init() {
   await step(4, 'Preparing renderer…');
@@ -104,8 +117,46 @@ async function init() {
   G.fx = new Effects(engine.scene);
   G.loot = new LootManager();
   G.quests = new QuestLog();
-  const player = new Player();
-  const loaded = player.load();
+
+  await step(86, 'Spawning monsters…');
+  roumen.monsters = new MonsterManager(SPAWN_ZONES, roumen.root);
+  G.monsters = roumen.monsters;
+  G.monsters.spawnAll();
+  try { MonsterModels.warmupMonsters && MonsterModels.warmupMonsters(engine.renderer, engine.camera, engine.scene); } catch (e) { console.warn(e); }
+
+  await step(94, 'Waking up the dragon…');
+  try { await preloadReko(); } catch (e) { console.warn('reko model', e); }
+  initSlots();
+  window.G = G; // debug handle
+
+  // title screen -> character select terrace -> game (dev: ?autostart skips straight into the last hero)
+  const q = new URLSearchParams(location.search);
+  let slot = getActiveSlot();
+  if (!q.has('autostart')) {
+    let skipIntro = q.has('select');
+    try { skipIntro = skipIntro || sessionStorage.getItem(SKIP_INTRO_KEY) === '1'; sessionStorage.removeItem(SKIP_INTRO_KEY); } catch { /* ignore */ }
+    await step(100, 'Ready!');
+    const hideLoading = () => document.getElementById('loading').classList.add('done');
+    if (!skipIntro) await runTitle(engine, { onShown: hideLoading });
+    slot = await runCharSelect(engine, { onShown: hideLoading, preselect: slot });
+  } else {
+    await step(100, 'Ready!');
+  }
+  await startGame(engine, roumen, slot, q);
+}
+
+// ------------------------------------------------------------------ enter the game with the hero of `slot`
+async function startGame(engine, roumen, slot, q) {
+  const auto = q.has('autostart');
+  const data = loadSlot(slot);
+  if (!auto) {
+    // the terrace faded to black; the travel curtain takes over underneath while the world is prepared
+    curtain.show(WORLD_NAMES[(data && !data.fresh && data.world) || 'roumen'] || 'Roumen');
+    setTimeout(() => fadeScreen(false, 0), 500);
+  }
+  setActiveSlot(slot);
+  const player = new Player((data && data.name) || 'Ryou', (data && data.look) || {}, slot);
+  const loaded = player.load(data);
   G.player = player;
   player.attach(engine.scene);
   const startWorld = loaded && player._savedWorld && player._savedWorld !== 'roumen' ? player._savedWorld : 'roumen';
@@ -117,13 +168,7 @@ async function init() {
   G.npcs = roumen.npcs;
   if (player._savedQuests) G.quests.load(player._savedQuests);
 
-  await step(88, 'Spawning monsters…');
-  roumen.monsters = new MonsterManager(SPAWN_ZONES, roumen.root);
-  G.monsters = roumen.monsters;
-  G.monsters.spawnAll();
-  try { MonsterModels.warmupMonsters && MonsterModels.warmupMonsters(engine.renderer, engine.camera, engine.scene); } catch (e) { console.warn(e); }
-
-  await step(94, 'Drawing the map…');
+  const canvas = engine.canvas;
   G.input = new Input(canvas);
   G.cam = new FollowCamera(engine.camera, roumen.terrain);
   G.cam.setBlockers(roumen.colliders, roumen.terrain);
@@ -141,27 +186,25 @@ async function init() {
   if (startWorld !== 'roumen') {
     try {
       const at = { x: player.pos.x, z: player.pos.z, rotY: player.rotY };
-      const w = await getWorld(startWorld, (pct, text) => step(94 + pct * 0.05, text));
+      const w = await getWorld(startWorld, auto ? (pct, text) => step(100, text) : (pct, text) => curtain.progress(pct, text));
       if (!w.nav.isWalkable(at.x, at.z)) Object.assign(at, w.spawn);
       enterWorld(w, at);
     } catch (e) { console.error('could not restore world', startWorld, e); enterWorld(roumen); }
   }
-
   // warm up: compile shaders by rendering once
   engine.setShadowFocus(player.pos);
   engine.render();
   hud.refreshPortrait();
 
-  await step(100, loaded ? `Welcome back, ${player.name}!` : 'Ready!');
-  showStart(loaded, () => {
-    G.audio.unlock();
-    document.getElementById('loading').classList.add('done');
-    if (!loaded) {
-      G.msg('Welcome to Roumen! Talk to Town Chief Oswin on the plaza (look for the ! marker).', 'quest');
-      G.msg('Left-click to move · double-click monsters to attack · right-drag to rotate the camera.', 'sys');
-    }
-    hud.centerMsg(G.world.areaNameAt(player.pos.x, player.pos.z), 3);
-  });
+  G.audio.unlock();
+  if (auto) { document.getElementById('loading').style.transition = 'none'; document.getElementById('loading').classList.add('done'); }
+  else curtain.hide();
+  if (!loaded) {
+    G.msg(`Welcome to Roumen, ${player.name}! Talk to Town Chief Oswin on the plaza (look for the ! marker).`, 'quest');
+    G.msg('Left-click to move · double-click monsters to attack · right-drag to rotate the camera.', 'sys');
+  }
+  player.save();
+  hud.centerMsg(G.world.areaNameAt(player.pos.x, player.pos.z), 3);
 
   // ------------------------------------------------------------------ main loop
   const clock = new THREE.Clock();
@@ -195,7 +238,7 @@ async function init() {
   };
   window.addEventListener('resize', fitHud);
   fitHud();
-  window.G = G; // debug handle
+  if (auto) setTimeout(() => applyDebugParams(q), 10);
 }
 
 // ------------------------------------------------------------------ Roumen (the start world)
@@ -251,40 +294,18 @@ async function buildRoumen(engine, assets) {
   };
 }
 
-function showStart(loaded, onStart) {
-  const inner = document.querySelector('.load-inner');
-  const box = document.createElement('div');
-  box.innerHTML = `${loaded ? '' : '<input class="name-input" maxlength="14" placeholder="Character name" value="Ryou">'}
-    <div><button class="start-btn">${loaded ? 'Continue' : 'Start Adventure'}</button></div>
-    <div class="start-sub">Fighter · Roumen<br>Click to move · Double-click to attack · 1–0 skills · Q/E stones · I/C/K/L/M windows</div>`;
-  inner.appendChild(box);
-  const btn = box.querySelector('.start-btn');
-  const input = box.querySelector('.name-input');
-  const go = () => {
-    if (input && input.value.trim()) G.player.name = input.value.trim().slice(0, 14);
-    G.player.save();
-    onStart();
-  };
-  btn.onclick = go;
-  const q = new URLSearchParams(location.search);
-  if (q.has('autostart')) {
-    document.getElementById('loading').style.transition = 'none';
-    setTimeout(async () => {
-      go();
-      if (q.get('map') && q.get('map') !== G.world.id) await G.travel(q.get('map'));
-      // debug camera / position params
-      if (q.get('pos')) { const [x, z] = q.get('pos').split(',').map(Number); G.player.teleport(x, z); }
-      if (q.get('rot')) G.player.rotY = Number(q.get('rot'));
-      if (q.get('yaw')) G.cam.yaw = Number(q.get('yaw'));
-      if (q.get('pitch')) G.cam.pitch = Number(q.get('pitch'));
-      if (q.get('dist')) { G.cam.targetDist = G.cam.dist = Number(q.get('dist')); G.cam.maxDist = Math.max(G.cam.maxDist, G.cam.dist); }
-      if (q.has('hideui')) document.getElementById('hud').style.display = 'none';
-      if (q.get('win')) q.get('win').split(',').forEach((w) => G.ui.win.open(w));
-      if (q.get('target')) { const t = G.monsters.nearestTarget(G.player.pos, 60); if (t) G.player.setTarget(t); }
-      G.cam.snap(G.player.pos);
-    }, 10);
-  }
-  if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); e.stopPropagation(); });
+// dev URL params for ?autostart: &map=cyclone &pos=x,z &rot= &yaw= &pitch= &dist= &hideui &win=inv,char &target
+async function applyDebugParams(q) {
+  if (q.get('map') && q.get('map') !== G.world.id) await G.travel(q.get('map'));
+  if (q.get('pos')) { const [x, z] = q.get('pos').split(',').map(Number); G.player.teleport(x, z); }
+  if (q.get('rot')) G.player.rotY = Number(q.get('rot'));
+  if (q.get('yaw')) G.cam.yaw = Number(q.get('yaw'));
+  if (q.get('pitch')) G.cam.pitch = Number(q.get('pitch'));
+  if (q.get('dist')) { G.cam.targetDist = G.cam.dist = Number(q.get('dist')); G.cam.maxDist = Math.max(G.cam.maxDist, G.cam.dist); }
+  if (q.has('hideui')) document.getElementById('hud').style.display = 'none';
+  if (q.get('win')) q.get('win').split(',').forEach((w) => G.ui.win.open(w));
+  if (q.get('target')) { const t = G.monsters.nearestTarget(G.player.pos, 60); if (t) G.player.setTarget(t); }
+  G.cam.snap(G.player.pos);
 }
 
 // ------------------------------------------------------------------ picking

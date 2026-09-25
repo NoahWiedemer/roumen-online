@@ -1,4 +1,5 @@
 // Player character from /models/player.glb (auto-rigged with UniRig, no clips), retargeted by skinnedRig.js
+import * as THREE from 'three';
 import { loadSkinnedTemplate, createSkinnedRig } from './skinnedRig.js';
 
 const BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
@@ -37,5 +38,48 @@ export function preloadPlayerModel() {
 }
 export function createPlayerRig(look = {}) {
   if (!template) throw new Error('player model not loaded — await preloadPlayerModel() first');
-  return createSkinnedRig(template, look, { gripDrop: 0.075, portraitY: 1.5, portraitDist: 0.72 });
+  const rig = createSkinnedRig(template, look, { gripDrop: 0.075, portraitY: 1.5, portraitDist: 0.72 });
+  applyPlayerTint(rig, look);
+  return rig;
+}
+
+// Per-character colours: the texture has saturated blue hair and an almost white shirt, so both are masked by
+// hue / saturation in the shader and recoloured with the shading kept (look.hairTint / look.outfitTint, null =
+// original). Calling it again on the same rig just updates the colours.
+export function applyPlayerTint(rig, look = {}) {
+  if (!rig.skinned) return;
+  const hair = look.hairTint, outfit = look.outfitTint;
+  let m = rig.skinned.material;
+  if (!m.userData.tint) {
+    if (!hair && !outfit) return;
+    m = m.clone();
+    const u = { uHair: { value: new THREE.Color() }, uHairOn: { value: 0 }, uOutfit: { value: new THREE.Color() }, uOutfitOn: { value: 0 } };
+    m.userData.tint = u;
+    m.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uHair, uOutfit;\nuniform float uHairOn, uOutfitOn;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          {
+            vec3 sc = sqrt(max(diffuseColor.rgb, vec3(0.0)));          // ~sRGB for the masks
+            float mx = max(max(sc.r, sc.g), sc.b), mn = min(min(sc.r, sc.g), sc.b);
+            float sat = mx > 0.001 ? (mx - mn) / mx : 0.0;
+            float hairM = smoothstep(0.22, 0.4, sat) * smoothstep(0.02, 0.12, sc.b - max(sc.r, sc.g)) * uHairOn;
+            float shirtM = (1.0 - smoothstep(0.08, 0.2, sat)) * smoothstep(0.45, 0.62, mx) * uOutfitOn;
+            vec3 hairC = uHair * (mx / 0.82);
+            vec3 shirtC = uOutfit * (mx / 0.88);
+            diffuseColor.rgb = mix(diffuseColor.rgb, hairC * hairC, hairM);
+            diffuseColor.rgb = mix(diffuseColor.rgb, shirtC * shirtC, shirtM);
+          }`);
+    };
+    m.customProgramCacheKey = () => 'player-tint-v1';
+    rig.skinned.material = m;
+  }
+  const u = m.userData.tint;
+  // uniforms work in ~sRGB space (squared back to linear in the shader)
+  const toS = (hex, c) => { c.set(hex); c.convertLinearToSRGB(); };
+  if (hair) toS(hair, u.uHair.value);
+  if (outfit) toS(outfit, u.uOutfit.value);
+  u.uHairOn.value = hair ? 1 : 0;
+  u.uOutfitOn.value = outfit ? 1 : 0;
 }
