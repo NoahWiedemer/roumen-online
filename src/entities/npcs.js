@@ -216,6 +216,7 @@ export class NPC {
     this.groundY = this.pos.y;
     if (this.faceGoal !== undefined) this.rotY = dampAngle(this.rotY, this.faceGoal, speed > 0 ? 6 : 4, dt);
     this.anim.speed += ((speed > 0 ? 0.36 : 0) - this.anim.speed) * (1 - Math.exp(-8 * dt));
+    this.anim.groundSpeed = speed;
     this.anim.moveDir = 1;
   }
 }

@@ -2368,6 +2368,20 @@ ITEMS.robo_blades = (ctx) => itemFrame(ctx, '#b050ff', () => {
   sparkle(ctx, 80, 26, 4.5, '#ffffff', '#6aa8ff');
 });
 
+// a small bundle of long wiry whiskers tied with a string
+ITEMS.rat_whisker = (ctx) => itemFrame(ctx, '#c8c0d8', () => {
+  obj(ctx, (l) => {
+    const strands = [[-26, -30, 0.9], [-12, -38, 1.1], [4, -36, 1.0], [18, -28, 0.85], [-2, -22, 0.8]];
+    for (const [dx, dy, w] of strands) {
+      l.beginPath(); l.moveTo(50, 72);
+      l.bezierCurveTo(50 + dx * 0.3, 72 + dy * 0.6, 50 + dx * 0.9, 72 + dy * 1.1, 50 + dx * 1.5, 72 + dy * 1.4);
+      l.strokeStyle = '#2a2430'; l.lineWidth = 2.6 * w; l.lineCap = 'round'; l.stroke();
+      l.strokeStyle = '#d8d2e2'; l.lineWidth = 1.4 * w; l.stroke();
+    }
+    rr(l, 44, 68, 12, 8, 3); l.fillStyle = lin(l, 44, 68, 44, 76, ['#c98a4a', '#7a4a20']); l.fill(); l.lineWidth = 0.8; l.strokeStyle = '#3a2008'; l.stroke();
+  }, { glow: '#e8e0ff', glowR: 3, glowA: 0.4 });
+});
+
 ITEMS.mushroom_cap = (ctx) => itemFrame(ctx, '#ff6a8a', () => {
   obj(ctx, (l) => {
     l.save(); l.translate(50, 52); l.rotate(-16 * D); l.translate(-50, -52);

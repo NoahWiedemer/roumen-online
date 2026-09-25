@@ -665,8 +665,11 @@ export class Player {
       }
     }
 
-    // facing
+    // facing (+ turn lean from the yaw rate)
+    const prevRot = this.rotY;
     if (this.faceGoal !== undefined && !this.dead) this.rotY = dampAngle(this.rotY, this.faceGoal, 16, dt);
+    const yawRate = dt > 1e-5 ? angleDiff(prevRot, this.rotY) / dt : 0;
+    this.anim.lean += (clamp(yawRate * 0.1, -0.35, 0.35) - this.anim.lean) * (1 - Math.exp(-8 * dt));
 
     // vertical: terrain + jump
     const gh = G.terrain.groundAt(this.pos.x, this.pos.z);
@@ -679,7 +682,9 @@ export class Player {
 
     // animation
     const target = moving ? clamp(speed / RUN_SPEED, 0.35, 1) : 0;
-    this.anim.speed = this.anim.speed + (target - this.anim.speed) * (1 - Math.exp(-14 * dt));
+    this.anim.speed = this.anim.speed + (target - this.anim.speed) * (1 - Math.exp(-12 * dt));
+    this.anim.groundSpeed = moving ? speed : 0;
+    this.anim.setAirborne(this.airborne, this.velY);
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
     this.anim.update(dt, this.pos);

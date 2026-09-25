@@ -46,6 +46,26 @@ const SPECS = {
       mat.needsUpdate = true;
     },
   },
+  // the rat-man monster (hatchet in the right hand is part of the mesh); delivered in a crouched stride pose,
+  // so skinnedRig straightens the limbs and re-grounds the feet. Bone_002..004 are the front loincloth.
+  ratman_mob: {
+    url: BASE + 'models/ratman_mob.glb', rootBone: 'Bone_000', recenter: true, scale: 1, portraitY: 1.5, portraitDist: 0.8,
+    boneMap: {
+      hips: 'Bone_001', spine: 'Bone_007', chest: 'Bone_006', neck: 'Bone_020', head: 'Bone_019',
+      armL: 'Bone_025', elbowL: 'Bone_024', handL: 'Bone_023',
+      armR: 'Bone_030', elbowR: 'Bone_029', handR: 'Bone_028',
+      legL: 'Bone_018', kneeL: 'Bone_017', footL: 'Bone_016',
+      legR: 'Bone_013', kneeR: 'Bone_012', footR: 'Bone_011',
+    },
+    segmentEnd: {
+      armL: 'Bone_024', elbowL: 'Bone_023', handL: 'Bone_022', armR: 'Bone_029', elbowR: 'Bone_028', handR: 'Bone_027',
+      legL: 'Bone_017', kneeL: 'Bone_016', legR: 'Bone_012', kneeR: 'Bone_011',
+    },
+    material(mat) {
+      mat.metalnessMap = null; mat.metalness = 0.05; mat.roughness = 0.75;
+      mat.needsUpdate = true;
+    },
+  },
 };
 
 const templates = {};

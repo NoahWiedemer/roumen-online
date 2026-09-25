@@ -85,13 +85,14 @@ async function init() {
   // other worlds are built on their first visit (see world/worlds.js)
   registerBuilder('cyclone', async (progress) => {
     await progress(2, 'Summoning the locals…');
-    try { await preloadNpcModels(['ratman', 'robo']); } catch (e) { console.warn('NPC models', e); }
+    try { await preloadNpcModels(['ratman', 'robo', 'ratman_mob']); } catch (e) { console.warn('NPC models', e); }
     const { buildCycloneWorld } = await import('./world/cyclone/index.js');
+    const { SPAWN_ZONES: CYCLONE_SPAWNS } = await import('./world/cyclone/layout.js');
     const w = await buildCycloneWorld({ engine, progress });
     w.root.visible = false;
     engine.scene.add(w.root);
     w.npcs = new NpcManager(NPCS.filter((n) => n.world === 'cyclone'), { parent: w.root, terrain: w.terrain, colliders: w.colliders });
-    w.monsters = new MonsterManager([], w.root);
+    w.monsters = new MonsterManager(CYCLONE_SPAWNS, w.root);   // spawned on the first visit (worlds.enterWorld)
     return w;
   });
   G.travel = travel;

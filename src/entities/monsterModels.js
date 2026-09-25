@@ -18,6 +18,7 @@ import { MushroomMonster } from './monsters/mushroom.js';
 import { BeeMonster } from './monsters/bee.js';
 import { BoarMonster } from './monsters/boar.js';
 import { ImpMonster, preloadImp, impReady } from './monsters/imp.js';
+import { SkinnedMonster } from './monsters/skinned.js';
 
 export const MONSTER_TYPES = ['slime', 'mushroom', 'imp', 'kingslime'];
 export const ALL_MONSTER_TYPES = ['slime', 'mushroom', 'imp', 'kingslime', 'bee', 'boar'];
@@ -29,6 +30,11 @@ const CTORS = {
   imp: ImpMonster,
   bee: BeeMonster,
   boar: BoarMonster,
+  // rat-men (skinned ratman_mob.glb — preload with npcModels.preloadNpcModel('ratman_mob') before spawning)
+  ratman: SkinnedMonster,
+  ratman_digger: SkinnedMonster,
+  ratman_hypno: SkinnedMonster,
+  ratman_frenzy: SkinnedMonster,
 };
 
 // Async: load + prepare every asset that is not generated in code (currently the rigged imp). Safe to call repeatedly.

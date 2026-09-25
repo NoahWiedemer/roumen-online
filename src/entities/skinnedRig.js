@@ -41,8 +41,17 @@ export async function loadSkinnedTemplate(spec) {
   if (spec.material) spec.material(skinned.material);
   // optional: move the model so the root bone stands on the origin (models are not always centred)
   const shift = spec.recenter ? new THREE.Vector3(-rest[spec.rootBone].p.x, 0, -rest[spec.rootBone].p.z) : new THREE.Vector3();
-  const box = new THREE.Box3().setFromObject(skinned);
-  return { spec, scene, rest, offset, shift, hipY: rest[spec.rootBone].p.y, height: box.max.y - box.min.y };
+  const T = { spec, scene, rest, offset, shift, hipY: rest[spec.rootBone].p.y, groundFix: 0, height: 1 };
+  // Models delivered in an action pose (bent / spread legs) get their limbs straightened by the retarget, which
+  // lifts the feet out of or pushes them into the ground: pose a probe rig in the zero pose and measure the
+  // skinned bounds so the feet stand exactly on y = 0 and the height is the real standing height.
+  const probe = createSkinnedRig(T);
+  probe.root.updateMatrixWorld(true);
+  probe.skinned.computeBoundingBox();
+  const bb = probe.skinned.boundingBox;
+  T.groundFix = -bb.min.y;
+  T.height = bb.max.y - bb.min.y;
+  return T;
 }
 
 export function createSkinnedRig(T, look = {}, extra = {}) {
@@ -55,6 +64,7 @@ export function createSkinnedRig(T, look = {}, extra = {}) {
   root.add(body);
   const model = SkeletonUtils.clone(T.scene);
   model.position.copy(T.shift);
+  model.position.y += T.groundFix;
   body.add(model);
   const bones = {};
   let skinned = null;

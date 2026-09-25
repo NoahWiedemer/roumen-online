@@ -66,6 +66,8 @@ export function enterWorld(world, at = null) {
   G.world = world;
   G.terrain = world.terrain; G.colliders = world.colliders; G.nav = world.nav; G.portals = world.portals || [];
   G.npcs = world.npcs; G.monsters = world.monsters;
+  // monsters need the world's nav grid / terrain in G, so a world populates on its first visit
+  if (world.monsters && !world.monsters.spawned) world.monsters.spawnAll();
   if (p) {
     p.setTarget(null);
     p.stopActions();

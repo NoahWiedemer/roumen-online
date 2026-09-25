@@ -114,15 +114,18 @@ export const P_DEAD = {
   legR: [-0.25, 0, -0.15], kneeR: [0.6, 0, 0], footR: [0.3, 0, 0],
 };
 
-// ---- dual blades: relaxed with both blades hanging down-back, and a low wide battle stance
+// ---- dual blades: relaxed stance with the fists in front of the hips and both blades pointing forward-down,
+// tips converging a little in front of the feet; plus a low wide battle stance
 export const P_DUAL_IDLE = {
-  pos: [0, -0.01, 0],
-  hips: [0, 0.05, 0], spine: [0.05, -0.03, 0], chest: [0, -0.03, 0], neck: [0, 0, 0], head: [0.03, 0, 0],
-  armR: [0.12, 0, -0.2], elbowR: [-0.4, 0, 0], handR: [2.05, 0, -0.12],
-  armL: [0.12, 0, 0.2], elbowL: [-0.4, 0, 0], handL: [2.05, 0, 0.12],
-  legL: [-0.04, 0.06, 0.08], kneeL: [0.06, 0, 0], footL: [0, 0, -0.04],
-  legR: [0.05, -0.1, -0.09], kneeR: [0.08, 0, 0], footR: [-0.02, 0, 0.05],
+  pos: [0, -0.015, 0],
+  hips: [0, 0.06, 0], spine: [0.07, -0.03, 0], chest: [0.02, -0.03, 0], neck: [0, 0, 0], head: [0.04, 0, 0],
+  armR: [-0.3, 0.1, -0.16], elbowR: [-0.58, 0, 0], handR: [1.2, 0.2, 0.04],
+  armL: [-0.3, -0.1, 0.16], elbowL: [-0.58, 0, 0], handL: [1.2, -0.2, -0.04],
+  legL: [-0.05, 0.08, 0.09], kneeL: [0.08, 0, 0], footL: [0, 0, -0.04],
+  legR: [0.06, -0.12, -0.1], kneeR: [0.1, 0, 0], footR: [-0.02, 0, 0.05],
 };
+// arm poses used by the dual-blade run (right blade trailing low behind, left blade across the chest)
+const DUAL_RUN = { armL: [-0.62, 0.45, 0.25], elbowL: [-1.45, 0, 0], handL: [-1.6, 0.5, 0.2], handR: [1.95, 0.1, -0.15] };
 export const P_DUAL_BATTLE = {
   pos: [0, -0.07, 0],
   hips: [0, 0.3, 0], spine: [0.2, -0.18, 0], chest: [0.08, -0.12, 0], neck: [0, -0.05, 0], head: [-0.1, -0.12, 0],
@@ -435,6 +438,9 @@ export class Animator {
     this.baseIdlePose = this.idlePose;
     this.battlePose = P_BATTLE;
     this.style = 'sword';   // weapon style: 'sword' | 'dual' (poses, run cycle and clip re-basing)
+    this.groundSpeed = null; // m/s set by the controller (drives the step cadence); null = derive from speed
+    this.lean = 0;          // turn lean (set by the controller from the yaw rate)
+    this.air = 0; this.inAir = false; this.airVel = 0; this.landT = 0; this.landK = 0;
     this.t = 0;
     this.speed = 0;         // 0..1 locomotion blend (running)
     this.moveDir = 1;       // 1 forward, -1 backwards
@@ -483,8 +489,11 @@ export class Animator {
   locomotion(dt) {
     const J = this.base;
     const s = this.speed;
-    const sp = 0.55 + s * 0.45;
-    this.phase += dt * (s > 0.01 ? (5.6 + s * 4.0) : 0) * (this.moveDir < 0 ? 0.8 : 1);
+    // cadence follows the real ground speed so the feet do not slide: one full cycle (two steps) covers
+    // strideLen metres (longer strides when running, scaled with the character's size)
+    const v = this.groundSpeed ?? s * 6.2;
+    const strideLen = (1.3 + 1.4 * clamp((v - 1) / 5, 0, 1)) * (this.rig.scale || 1);
+    this.phase += dt * (v > 0.05 && s > 0.01 ? (Math.PI * 2 * v) / strideLen : 0) * (this.moveDir < 0 ? 0.85 : 1);
     const ph = this.phase;
     const t = this.t;
 
@@ -537,27 +546,60 @@ export class Animator {
         run.armR = [-sw * 0.85 * dir, -0.1, -0.28]; run.elbowR = [-1.05 - Math.max(0, sw) * 0.45, 0, 0]; run.handR = [0.1, 0, 0];
         run.armL[1] = 0.1;
       } else if (this.style === 'dual') {
-        // ninja run: torso leaning in, both arms swept back with the blades trailing behind
-        run.spine = [0.34 * dir * s, sw * 0.08, -cw * 0.02];
-        run.chest = [0.08, sw * 0.1, 0];
-        run.head = [-0.3 * dir * s, -sw * 0.05, 0];
-        run.armR = [0.95 - sw * 0.14, 0, -0.34]; run.elbowR = [-0.45 - Math.max(0, sw) * 0.12, 0, 0]; run.handR = [2.25, 0, -0.25];
-        run.armL = [0.95 + sw * 0.14, 0, 0.34]; run.elbowL = [-0.45 - Math.max(0, -sw) * 0.12, 0, 0]; run.handL = [2.25, 0, 0.25];
+        // assassin run: torso leaning in and turned slightly, right blade trailing low behind, left blade held
+        // bent in front of the chest, pointing back along the forearm; arms only bob a little with the stride
+        run.hips = [0.08 * dir, -sw * 0.12 - 0.12, cw * 0.03];
+        run.spine = [0.3 * dir * s, sw * 0.06 + 0.1, -cw * 0.02];
+        run.chest = [0.1, sw * 0.08 + 0.12, 0];
+        run.head = [-0.28 * dir * s, -sw * 0.05 - 0.12, 0];
+        run.armR = [0.5 - sw * 0.1, 0.1, -0.22]; run.elbowR = [-0.2 - Math.max(0, sw) * 0.08, 0, 0]; run.handR = DUAL_RUN.handR;
+        run.armL = [...DUAL_RUN.armL]; run.armL[0] += cw * 0.05; run.elbowL = DUAL_RUN.elbowL; run.handL = DUAL_RUN.handL;
       }
-      if (this.runOverride) for (const k of ['armR', 'elbowR', 'handR']) if (this.runOverride[k]) run[k] = this.runOverride[k];
+      if (this.runOverride) for (const k of Object.keys(this.runOverride)) if (run[k]) run[k] = this.runOverride[k];
       const w = Math.min(1, s * 1.8);
       for (const k of Object.keys(run)) {
         const a = J[k], b = run[k];
         a[0] += (b[0] - a[0]) * w; a[1] += (b[1] - a[1]) * w; a[2] += (b[2] - a[2]) * w;
       }
+      // lean into turns (lean > 0 = turning left), stronger at speed
+      const ln = this.lean * s;
+      J.hips[2] -= ln * 0.5; J.spine[2] -= ln * 0.35; J.head[2] += ln * 0.3;
+    }
+    // airborne: tuck the legs while rising, reach down while falling; short squash on landing
+    if (this.air > 0.001) {
+      const up = clamp(this.airVel / 6, -1, 1);
+      const k = this.air;
+      const tuck = clamp(0.4 + up * 0.6, 0, 1);
+      const air = {
+        pos: [0, 0.02, 0], spine: [0.1 - up * 0.15, 0, 0], head: [-0.05 + up * 0.1, 0, 0],
+        legL: [-0.95 * tuck - 0.2, 0, 0.08], kneeL: [0.35 + 1.25 * tuck, 0, 0], footL: [0.35 * tuck, 0, 0],
+        legR: [0.3 - 0.35 * tuck, 0, -0.08], kneeR: [0.3 + 0.75 * tuck, 0, 0], footR: [0.25, 0, 0],
+      };
+      for (const key of Object.keys(air)) {
+        const a = J[key], b = air[key];
+        a[0] += (b[0] - a[0]) * k; a[1] += (b[1] - a[1]) * k; a[2] += (b[2] - a[2]) * k;
+      }
+    }
+    if (this.landT > 0) {
+      const b = Math.sin((1 - this.landT / 0.22) * Math.PI) * this.landK;
+      J.pos[1] -= 0.07 * b; J.kneeL[0] += 0.45 * b; J.kneeR[0] += 0.45 * b; J.legL[0] -= 0.22 * b; J.legR[0] -= 0.22 * b; J.spine[0] += 0.12 * b;
+      J.footL[0] -= 0.2 * b; J.footR[0] -= 0.2 * b;
+      this.landT = Math.max(0, this.landT - dt);
     }
     if (this.sit > 0.001) blendPose(J, P_SIT, this.sit, J);
+  }
+  // controller hooks: airborne state / landing impact
+  setAirborne(on, velY = 0) {
+    if (this.inAir && !on) { this.landT = 0.22; this.landK = clamp(-this.airVel / 7, 0.3, 1); }
+    this.inAir = on;
+    this.airVel = velY;
   }
 
   update(dt, rootWorldPos) {
     this.t += dt;
     this.battle += (this.battleTarget - this.battle) * (1 - Math.exp(-6 * dt));
     this.sit += (this.sitTarget - this.sit) * (1 - Math.exp(-5 * dt));
+    this.air += ((this.inAir ? 1 : 0) - this.air) * (1 - Math.exp(-(this.inAir ? 12 : 20) * dt));
     this.locomotion(dt);
 
     let pose = this.base;

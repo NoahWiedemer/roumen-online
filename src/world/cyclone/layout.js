@@ -130,6 +130,37 @@ export const BAMBOO_GROVES = [
   { x: 57, z: 94, r: 10, n: 55 }, { x: -24, z: 124, r: 7, n: 30 }, { x: 24, z: 102, r: 6, n: 26 }, { x: 55, z: 58, r: 8, n: 36 },
 ];
 
+// ------------------------------------------------------------------ monsters
+// Rat-men get stronger, more hypnotised (tier tint) and aggressive the higher up the hill; imps roam the forest
+// and the ground ring at the foot of the hill only. The arrival, Sir Ratman, Robo and the summit stay clear.
+const zoneAt = (id, type, a, r, rad, count, lv) => { const [x, z] = polar(deg(a), r); return { id, type, x, z, r: rad, count, lv }; };
+export const SPAWN_ZONES = [
+  // Forest of Mist (passive)
+  { id: 'rat_f1', type: 'ratman', x: -32, z: 126, r: 12, count: 4, lv: [3, 4] },
+  { id: 'rat_f2', type: 'ratman', x: 30, z: 108, r: 11, count: 4, lv: [3, 4] },
+  { id: 'rat_f3', type: 'ratman', x: -28, z: 84, r: 12, count: 4, lv: [4, 5] },
+  { id: 'rat_f4', type: 'ratman', x: 28, z: 72, r: 11, count: 4, lv: [4, 5] },
+  { id: 'imp_f1', type: 'imp', x: -46, z: 102, r: 9, count: 4, lv: [4, 5] },
+  { id: 'imp_f2', type: 'imp', x: 44, z: 90, r: 9, count: 4, lv: [5, 6] },
+  // foot of Cyclone Hill (ground ring)
+  { id: 'imp_r1', type: 'imp', x: -40, z: 22, r: 9, count: 4, lv: [6, 7] },
+  { id: 'imp_r2', type: 'imp', x: 38, z: 12, r: 8, count: 3, lv: [6, 7] },
+  // tier 1 (passive diggers)
+  zoneAt('rat_t1a', 'ratman_digger', 120, 63, 7, 3, [6, 7]),
+  zoneAt('rat_t1b', 'ratman_digger', 50, 63, 7, 3, [6, 7]),
+  zoneAt('rat_t1c', 'ratman_digger', -50, 63, 7, 3, [6, 7]),
+  // tier 2 (hypnotised, aggressive at short range)
+  zoneAt('rat_t2a', 'ratman_hypno', -100, 46, 6, 3, [8, 9]),
+  zoneAt('rat_t2b', 'ratman_hypno', -25, 46, 6, 3, [8, 10]),
+  zoneAt('rat_t2c', 'ratman_hypno', 150, 46, 6, 3, [9, 10]),
+  zoneAt('rat_t2d', 'ratman_hypno', 60, 46, 5, 3, [8, 9]),
+  // tier 3 (frenzied)
+  zoneAt('rat_t3a', 'ratman_frenzy', 90, 29, 5, 3, [11, 12]),
+  zoneAt('rat_t3b', 'ratman_frenzy', -150, 29, 5, 3, [11, 13]),
+  zoneAt('rat_t3c', 'ratman_frenzy', -60, 29, 4, 2, [12, 13]),
+  zoneAt('rat_t3d', 'ratman_frenzy', 30, 29, 4, 2, [11, 12]),
+];
+
 // labels for the area map window
 export const MAP_LABELS = [
   [0, 132, 'FOREST OF MIST', '#b8fff0'], [0, -40, 'CYCLONE HILL', '#ffd08a'], [122, -62, 'Windward Glade', '#c8ffb0'],

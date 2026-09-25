@@ -103,6 +103,7 @@ export const ITEMS = {
   imp_claw: { name: 'Imp Claw', type: 'material', icon: 'imp_claw', price: 22, stack: 99, desc: 'A hooked, bony claw.' },
   imp_wing: { name: 'Imp Ear-Wing', type: 'material', icon: 'imp_wing', price: 18, stack: 99, desc: 'Thin, leathery and a little twitchy.' },
   mushroom_cap: { name: 'Mushroom Cap', type: 'material', icon: 'mushroom_cap', price: 12, stack: 99, desc: 'A spotted cap, still springy.' },
+  rat_whisker: { name: 'Rat Whisker', type: 'material', icon: 'rat_whisker', price: 10, stack: 99, desc: 'A long, wiry whisker. It smells faintly of mist.' },
   king_crown_shard: { name: 'Crown Shard', type: 'material', icon: 'king_crown_shard', price: 600, stack: 99, desc: 'A glittering shard of the Slime King\'s crown.' },
 
   sword_wood: { name: 'Training Sword', type: 'weapon', icon: 'sword_wood', lv: 1, atk: [4, 7], price: 20, desc: 'A sturdy practice sword.', look: { blade: '#b98a55', rune: null } },
@@ -161,6 +162,28 @@ export const MONSTERS = {
     name: 'Wild Boar', baseLv: 7, hp: 150, atk: [20, 28], def: 10, exp: 32, copper: [30, 60], speed: 3.4, range: 1.9, atkCd: 2.1,
     aggressive: true, aggroRange: 8, leash: 28, respawn: 20,
     drops: [['boar_tusk', 0.35], ['boar_hide', 0.4]],
+  },
+  // ---- rat-men of the Forest of Mist / Cyclone Hill (skinned model; ko = knocked out instead of killed).
+  // The higher up the hill, the stronger, more aggressive and more deeply hypnotised (tier tint + glow).
+  ratman: {
+    name: 'Ratman', model: 'ratman_mob', variant: 'forest', ko: true, baseLv: 3, hp: 72, atk: [10, 15], def: 4, exp: 12, copper: [14, 30],
+    speed: 2.6, range: 1.7, atkCd: 2.1, aggressive: false, leash: 24, respawn: 20,
+    drops: [['rat_whisker', 0.5], ['hp_potion_s', 0.08], ['sp_potion_s', 0.05], ['bread', 0.05]],
+  },
+  ratman_digger: {
+    name: 'Ratman Digger', model: 'ratman_mob', variant: 'digger', ko: true, baseLv: 6, hp: 130, atk: [16, 23], def: 7, exp: 26, copper: [26, 50],
+    speed: 2.7, range: 1.7, atkCd: 2.0, aggressive: false, leash: 24, respawn: 20,
+    drops: [['rat_whisker', 0.55], ['hp_potion_s', 0.1], ['sp_potion_s', 0.06], ['boots_leather', 0.02]],
+  },
+  ratman_hypno: {
+    name: 'Hypnotized Ratman', model: 'ratman_mob', variant: 'hypno', ko: true, baseLv: 8, hp: 200, atk: [23, 31], def: 10, exp: 44, copper: [40, 75],
+    speed: 2.9, range: 1.8, atkCd: 1.9, aggressive: true, aggroRange: 4.5, leash: 22, respawn: 22,
+    drops: [['rat_whisker', 0.6], ['hp_potion_m', 0.08], ['sp_potion_m', 0.05], ['gloves_leather', 0.03]],
+  },
+  ratman_frenzy: {
+    name: 'Frenzied Ratman', model: 'ratman_mob', variant: 'frenzy', ko: true, scale: 1.08, baseLv: 11, hp: 300, atk: [31, 41], def: 14, exp: 78, copper: [60, 110],
+    speed: 3.1, range: 1.9, atkCd: 1.8, aggressive: true, aggroRange: 5, leash: 22, respawn: 24,
+    drops: [['rat_whisker', 0.65], ['hp_potion_m', 0.1], ['sp_potion_m', 0.07], ['helm_iron', 0.02], ['necklace_jade', 0.015]],
   },
   kingslime: {
     name: 'Slime King', baseLv: 9, hp: 950, atk: [26, 36], def: 11, exp: 320, copper: [700, 1200], speed: 2.2, range: 3.2, atkCd: 2.6,

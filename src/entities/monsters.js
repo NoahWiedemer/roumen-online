@@ -109,6 +109,8 @@ export class Monster {
     this.model.die();
     this.deathT = 0;
     G.audio.play('die');
+    // the hypnotised rat-men are only knocked out, never killed
+    if (this.def.ko) G.fx.text(this.headPos(), 'K.O.!', 'ko');
     G.emit('monsterKilled', this);
     const p = G.player;
     if (killer === p) {
@@ -130,7 +132,8 @@ export class Monster {
     if (this.dead) {
       this.deathT += dt;
       m.update(dt);
-      if (m.dead || this.deathT > 3) {
+      // knocked-out models lie on the ground for a while before they fade (lingerTime)
+      if (m.dead || this.deathT > Math.max(3, (m.lingerTime || 0) + (m.fadeDur || 0) + 0.5)) {
         this.removed = true;
         this.root.parent?.remove(this.root);
         this.respawnT = this.def.respawn;
@@ -256,6 +259,7 @@ export class MonsterManager {
     this.respawnQueue = [];
   }
   spawnAll() {
+    this.spawned = true;
     for (const z of this.zones) for (let i = 0; i < z.count; i++) this.spawnOne(z);
   }
   spawnOne(zone) {
