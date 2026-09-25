@@ -130,8 +130,19 @@ export function createSkinnedRig(T, look = {}, extra = {}) {
   J.hips.position.set(0, hipY, 0);
   afterPose();
 
+  // leg geometry for the Animator's foot IK (model units): thigh / shin lengths, height of the hip joint and
+  // of the ankle above the ground in the zero pose (legs hanging straight down, soles on y = 0)
+  const R = T.rest;
+  const thigh = R[boneMap.legL].p.distanceTo(R[boneMap.kneeL].p);
+  const shin = R[boneMap.kneeL].p.distanceTo(R[boneMap.footL].p);
+  const legTop = R[boneMap.legL].p.y + T.groundFix;
+  const legGeo = {
+    thigh, shin, top: legTop, ankle: Math.max(0.02, legTop - thigh - shin),
+    width: Math.abs(R[boneMap.legL].p.x - R[boneMap.legR].p.x) / 2,   // hip joint offset from the centre line
+  };
+
   return {
-    root, body, joints: J, mats, weapon, weaponHolder, weaponHolderL, skinned, bones,
+    root, body, joints: J, mats, weapon, weaponHolder, weaponHolderL, skinned, bones, legGeo,
     tails: [], flaps: [], setExpression() {}, afterPose,
     hipY, height: T.height * scale, headRadius: 0.16 * scale, scale,
     portraitY: (extra.portraitY ?? T.height * 0.88) * scale, portraitDist: (extra.portraitDist ?? 0.72) * scale,

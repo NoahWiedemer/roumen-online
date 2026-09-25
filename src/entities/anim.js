@@ -114,18 +114,58 @@ export const P_DEAD = {
   legR: [-0.25, 0, -0.15], kneeR: [0.6, 0, 0], footR: [0.3, 0, 0],
 };
 
-// ---- dual blades: relaxed stance with the fists in front of the hips and both blades pointing forward-down,
-// tips converging a little in front of the feet; plus a low wide battle stance
+// ---- dual blades: relaxed stance, arms loose at the sides and both blades angled down-back and out (a clear V
+// seen from the follow camera, never crossing the legs); plus a low wide battle stance
 export const P_DUAL_IDLE = {
   pos: [0, -0.015, 0],
-  hips: [0, 0.06, 0], spine: [0.07, -0.03, 0], chest: [0.02, -0.03, 0], neck: [0, 0, 0], head: [0.04, 0, 0],
-  armR: [-0.3, 0.1, -0.16], elbowR: [-0.58, 0, 0], handR: [1.2, 0.2, 0.04],
-  armL: [-0.3, -0.1, 0.16], elbowL: [-0.58, 0, 0], handL: [1.2, -0.2, -0.04],
-  legL: [-0.05, 0.08, 0.09], kneeL: [0.08, 0, 0], footL: [0, 0, -0.04],
-  legR: [0.06, -0.12, -0.1], kneeR: [0.1, 0, 0], footR: [-0.02, 0, 0.05],
+  hips: [0, 0.06, 0.02], spine: [0.05, -0.03, -0.01], chest: [0.02, -0.03, 0], neck: [0, 0, 0], head: [0.04, 0, 0],
+  armR: [0.05, 0, -0.3], elbowR: [-0.32, 0, 0], handR: [2.2, 0, -0.42],
+  armL: [0.05, 0, 0.3], elbowL: [-0.32, 0, 0], handL: [2.2, 0, 0.42],
+  legL: [-0.05, 0.08, 0.1], kneeL: [0.08, 0, 0], footL: [0, 0, -0.05],
+  legR: [0.06, -0.12, -0.1], kneeR: [0.14, 0, 0], footR: [-0.02, 0, 0.05],
 };
 // arm poses used by the dual-blade run (right blade trailing low behind, left blade across the chest)
-const DUAL_RUN = { armL: [-0.62, 0.45, 0.25], elbowL: [-1.45, 0, 0], handL: [-1.6, 0.5, 0.2], handR: [1.95, 0.1, -0.15] };
+const DUAL_RUN = {
+  armR: [0.5, 0.1, -0.22], elbowR: [-0.2, 0, 0], handR: [1.95, 0.1, -0.15],
+  armL: [-0.3, 0, 0.15], elbowL: [-1.6, -1.1, 0], handL: [-1.6, 0, 0],   // forearm across the chest, reverse grip
+};
+// sword run: right arm swept back, blade trailing behind and a little up
+const SWORD_RUN = { armR: [0.4, 0.1, -0.35], elbowR: [-0.35, 0, 0], handR: [2.3, 0, -0.35] };
+
+// ---- gait helpers (skinned rigs with rig.legGeo)
+// foot path of one leg over the gait cycle u (0 = touch-down in front); z in model units (travel / zc), y in leg
+// lengths above the standing ankle height: the planted foot slides
+// back under the body (heel strike -> flat -> toe-off), the swing lifts the heel and carries the foot forward
+const _footL = { z: 0, y: 0, pitch: 0 }, _footR = { z: 0, y: 0, pitch: 0 };
+const _ik = [0, 0];
+function footPath(u, D, travel, zc, lift, dir, out) {
+  if (u < D) {
+    const s = u / D;
+    const toe = s > 0.55 ? ((s - 0.55) / 0.45) ** 2 : 0;
+    out.z = zc + dir * travel * (0.5 - s);
+    out.y = toe * 0.1;
+    out.pitch = s < 0.15 ? -0.15 * (1 - s / 0.15) : toe;
+  } else {
+    const s = (u - D) / (1 - D);
+    const e = s * s * (3 - 2 * s);
+    out.z = zc + dir * travel * (e - 0.5);
+    out.y = lift * 6.75 * s * (1 - s) * (1 - s) + 0.1 * (1 - s) ** 3;   // heel kick early, foot comes down in time
+    out.pitch = (1 - e) - 0.15 * e;
+  }
+}
+// 2-bone IK in the sagittal plane: ankle target (z forward, y up) relative to the hip joint -> [hip, knee]
+// (hip negative = thigh forward, knee positive = bent, knee always in front)
+function legIK(z, y, T, S, out) {
+  let d = Math.hypot(z, y);
+  const maxD = (T + S) * 0.998;
+  if (d > maxD) { z *= maxD / d; y *= maxD / d; d = maxD; }
+  d = Math.max(d, Math.abs(T - S) + 1e-3);
+  const phi = Math.atan2(z, -y);
+  const alpha = Math.acos(clamp((T * T + d * d - S * S) / (2 * T * d), -1, 1));
+  out[0] = -(phi + alpha);
+  out[1] = Math.PI - Math.acos(clamp((T * T + S * S - d * d) / (2 * T * S), -1, 1));
+  return out;
+}
 export const P_DUAL_BATTLE = {
   pos: [0, -0.07, 0],
   hips: [0, 0.3, 0], spine: [0.2, -0.18, 0], chest: [0.08, -0.12, 0], neck: [0, -0.05, 0], head: [-0.1, -0.12, 0],
@@ -439,6 +479,7 @@ export class Animator {
     this.battlePose = P_BATTLE;
     this.style = 'sword';   // weapon style: 'sword' | 'dual' (poses, run cycle and clip re-basing)
     this.groundSpeed = null; // m/s set by the controller (drives the step cadence); null = derive from speed
+    this.gaitSpeed = 6.2;    // last real ground speed (the gait keeps its shape while blending out)
     this.lean = 0;          // turn lean (set by the controller from the yaw rate)
     this.air = 0; this.inAir = false; this.airVel = 0; this.landT = 0; this.landK = 0;
     this.t = 0;
@@ -492,8 +533,13 @@ export class Animator {
     // cadence follows the real ground speed so the feet do not slide: one full cycle (two steps) covers
     // strideLen metres (longer strides when running, scaled with the character's size)
     const v = this.groundSpeed ?? s * 6.2;
-    const strideLen = (1.3 + 1.4 * clamp((v - 1) / 5, 0, 1)) * (this.rig.scale || 1);
-    this.phase += dt * (v > 0.05 && s > 0.01 ? (Math.PI * 2 * v) / strideLen : 0) * (this.moveDir < 0 ? 0.85 : 1);
+    const sc = this.rig.scale || 1;
+    if (v > 0.3) this.gaitSpeed = v;                                 // gait shape holds while blending out
+    const G = this.rig.legGeo;
+    const strideLen = G
+      ? (G.thigh + G.shin) * sc * Math.min(3.3, 1.2 + 0.32 * v / sc)
+      : (1.3 + 1.4 * clamp((v - 1) / 5, 0, 1)) * sc;
+    this.phase += dt * (v > 0.05 && s > 0.01 ? (Math.PI * 2 * v) / strideLen : 0) * (!G && this.moveDir < 0 ? 0.85 : 1);
     const ph = this.phase;
     const t = this.t;
 
@@ -514,49 +560,99 @@ export class Animator {
     }
 
     if (s > 0.001) {
-      // run cycle: per-leg phase, swing/stance knee curve, foot roll, pelvis/chest counter-rotation
       const dir = this.moveDir;
-      const stride = (0.55 + s * 0.45) * (dir < 0 ? 0.7 : 1);
-      const leg = (p) => {
-        const sn = Math.sin(p), cs = Math.cos(p);
-        const hip = -sn * 0.72 * stride * dir;                       // negative = forward
-        const knee = 0.12 + Math.max(0, cs) * 1.45 * stride + Math.max(0, -sn) * Math.max(0, -cs) * 0.35;
-        const toeOff = Math.max(0, sn) * Math.max(0, cs) * 0.9;       // push off when the leg is behind
-        const foot = -(hip + knee) * 0.82 + toeOff - Math.max(0, cs) * 0.25;
-        return [hip, knee, foot];
-      };
-      const [hL, kL, fL] = leg(ph), [hR, kR, fR] = leg(ph + Math.PI);
-      const sw = Math.sin(ph), cw = Math.cos(ph);
-      const bob = Math.abs(cw) * 0.06 * stride;
+      let sw, cw, legs, pos, runK = 1;
+      if (G) {
+        // foot-planted gait for skinned rigs: each foot follows a stance / swing path and the legs are solved
+        // with 2-bone IK, so the planted foot stays on the ground and slides back exactly at ground speed.
+        // Walking keeps a foot on the ground (pelvis highest over the stance leg); running has a flight phase,
+        // a heel kick and the pelvis dipping on every landing.
+        const legLen = G.thigh + G.shin;
+        const vs = this.gaitSpeed / sc;                              // size-normalised speed
+        runK = clamp((vs - 1.4) / 2.0, 0, 1);
+        const strideLen = legLen * Math.min(3.3, 1.2 + 0.32 * vs);   // one cycle (two steps), model units
+        const travelMax = legLen * lerp(0.8, 0.62, runK);
+        const D = Math.max(travelMax / strideLen, lerp(0.58, 0.2, runK));    // stance share of the cycle
+        const travel = Math.min(travelMax, D * strideLen);
+        const u = ((ph / (Math.PI * 2)) % 1 + 1) % 1;
+        const bobSign = lerp(1, -1, runK);
+        const pelvis = legLen * (-lerp(0.06, 0.045, runK) + lerp(0.02, 0.03, runK) * bobSign * Math.cos(4 * Math.PI * (u - D / 2)));
+        const hipsPitch = lerp(0.03, 0.08, runK) * dir;
+        const zc = legLen * lerp(0.03, 0.07, runK) * dir;
+        const lift = lerp(0.12, 0.42, runK);
+        const ks = this.rig.hipY / 0.64;
+        legs = {};
+        const th = [0, 0];
+        footPath(u, D, travel, zc, lift, dir, _footL);
+        footPath((u + 0.5) % 1, D, travel, zc, lift, dir, _footR);
+        // pelvis turns with the legs (the hip of the leading leg forward); that moves the hip joints fore / aft,
+        // which the IK targets compensate so the planted foot does not skate
+        const dual = this.style === 'dual' && this.gait !== 'free';
+        const hipsYaw = (dual ? -0.1 : 0) + (dual ? 0.75 : 1) * clamp(-0.26 * (_footL.z - _footR.z) / legLen, -0.2, 0.2);
+        for (let i = 0; i < 2; i++) {
+          const f = i ? _footR : _footL;
+          const jointZ = (i ? 1 : -1) * G.width * Math.sin(hipsYaw);
+          const ty = G.ankle + f.y * legLen - (G.top + pelvis);
+          legIK(f.z - jointZ, ty, G.thigh, G.shin, _ik);
+          const side = i ? 'R' : 'L';
+          legs['leg' + side] = [_ik[0] - hipsPitch, 0, i ? -0.04 : 0.04];
+          legs['knee' + side] = [_ik[1], 0, 0];
+          legs['foot' + side] = [f.pitch - (_ik[0] + _ik[1]), 0, 0];
+          th[i] = -_ik[0];                                           // thigh angle, forward positive
+        }
+        legs.hips = [hipsPitch, hipsYaw, 0];
+        sw = clamp((th[0] - th[1]) * 1.1, -1, 1);                    // +1 = left leg forward
+        cw = Math.cos(2 * Math.PI * (u - D / 2));                    // +1 = over the left foot
+        pos = [cw * 0.012, pelvis / ks, 0];
+      } else {
+        // procedural chibi rig: simple sine run cycle
+        const stride = (0.55 + s * 0.45) * (dir < 0 ? 0.7 : 1);
+        const leg = (p) => {
+          const sn = Math.sin(p), cs = Math.cos(p);
+          const hip = -sn * 0.72 * stride * dir;
+          const knee = 0.12 + Math.max(0, cs) * 1.45 * stride + Math.max(0, -sn) * Math.max(0, -cs) * 0.35;
+          const foot = -(hip + knee) * 0.82 + Math.max(0, sn) * Math.max(0, cs) * 0.9 - Math.max(0, cs) * 0.25;
+          return [hip, knee, foot];
+        };
+        const [hL, kL, fL] = leg(ph), [hR, kR, fR] = leg(ph + Math.PI);
+        sw = Math.sin(ph); cw = Math.cos(ph);
+        legs = {
+          legL: [hL, 0, 0.05], kneeL: [kL, 0, 0], footL: [fL, 0, 0], legR: [hR, 0, -0.05], kneeR: [kR, 0, 0], footR: [fR, 0, 0],
+          hips: [0.06 * dir, this.style === 'dual' ? -sw * 0.12 - 0.1 : -sw * 0.16, 0],
+        };
+        pos = [sw * 0.012, -0.045 + Math.abs(cw) * 0.06 * stride, 0];
+      }
+      const lean = lerp(0.06, 0.2, runK) * dir * s;
       const run = {
-        pos: [Math.sin(ph) * 0.012, -0.045 + bob, 0],
-        hips: [0.06 * dir, -sw * 0.16, cw * 0.035],
-        spine: [0.2 * dir * s, sw * 0.1, -cw * 0.02],
-        chest: [0.04, sw * 0.16, 0],
-        neck: [0, -sw * 0.06, 0],
-        head: [-0.16 * dir * s, -sw * 0.06, cw * 0.02],
-        legL: [hL, 0, 0.05], kneeL: [kL, 0, 0], footL: [fL, 0, 0],
-        legR: [hR, 0, -0.05], kneeR: [kR, 0, 0], footR: [fR, 0, 0],
-        armL: [sw * 0.85 * dir, 0.1, 0.28], elbowL: [-1.05 - Math.max(0, -sw) * 0.45, 0, 0], handL: [0.1, 0, 0],
-        // sword arm: blade trailing behind, small counter swing
-        armR: [0.62 - sw * 0.18, 0, -0.36], elbowR: [-0.55 - Math.max(0, sw) * 0.15, 0, 0], handR: [2.15, 0, -0.3],
+        pos,
+        hips: [legs.hips[0], legs.hips[1], cw * 0.035],
+        spine: [lean, sw * 0.1, -cw * 0.02],
+        chest: [0.04 + lean * 0.3, sw * 0.18, 0],
+        neck: [0, -sw * 0.08, 0],
+        head: [-lean * 1.1, -sw * 0.08, cw * 0.02],
+        legL: legs.legL, kneeL: legs.kneeL, footL: legs.footL, legR: legs.legR, kneeR: legs.kneeR, footR: legs.footR,
+        // free arm pumps against the legs (elbow bent more when running)
+        armL: [sw * lerp(0.55, 0.85, runK) * dir, 0.1, 0.2], elbowL: [-lerp(0.35, 1.2, runK) - Math.max(0, -sw) * 0.4, 0, 0], handL: [0.1, 0, 0],
+        // sword arm: arm swept back, blade trailing behind and a little up so it never scrapes the ground
+        armR: [...SWORD_RUN.armR], elbowR: SWORD_RUN.elbowR, handR: SWORD_RUN.handR,
       };
+      run.armR[0] -= sw * 0.1;
       if (this.gait === 'free') {
         // unarmed walkers swing both arms in opposition to the legs
-        run.armR = [-sw * 0.85 * dir, -0.1, -0.28]; run.elbowR = [-1.05 - Math.max(0, sw) * 0.45, 0, 0]; run.handR = [0.1, 0, 0];
-        run.armL[1] = 0.1;
+        run.armR = [-sw * lerp(0.55, 0.85, runK) * dir, -0.1, -0.2]; run.elbowR = [-lerp(0.35, 1.2, runK) - Math.max(0, sw) * 0.4, 0, 0]; run.handR = [0.1, 0, 0];
       } else if (this.style === 'dual') {
         // assassin run: torso leaning in and turned slightly, right blade trailing low behind, left blade held
         // bent in front of the chest, pointing back along the forearm; arms only bob a little with the stride
-        run.hips = [0.08 * dir, -sw * 0.12 - 0.12, cw * 0.03];
-        run.spine = [0.3 * dir * s, sw * 0.06 + 0.1, -cw * 0.02];
-        run.chest = [0.1, sw * 0.08 + 0.12, 0];
-        run.head = [-0.28 * dir * s, -sw * 0.05 - 0.12, 0];
-        run.armR = [0.5 - sw * 0.1, 0.1, -0.22]; run.elbowR = [-0.2 - Math.max(0, sw) * 0.08, 0, 0]; run.handR = DUAL_RUN.handR;
-        run.armL = [...DUAL_RUN.armL]; run.armL[0] += cw * 0.05; run.elbowL = DUAL_RUN.elbowL; run.handL = DUAL_RUN.handL;
+        run.hips = [legs.hips[0], legs.hips[1], cw * 0.03];
+        run.spine = [lean * 1.4, sw * 0.06 + 0.1, -cw * 0.02];
+        run.chest = [0.08 + lean * 0.3, sw * 0.1 + 0.1, 0];
+        run.head = [-lean * 1.6, -sw * 0.06 - 0.12, 0];
+        run.armR = [...DUAL_RUN.armR]; run.armR[0] -= sw * 0.08; run.elbowR = DUAL_RUN.elbowR; run.handR = DUAL_RUN.handR;
+        run.armL = [...DUAL_RUN.armL]; run.armL[0] += cw * 0.04; run.elbowL = DUAL_RUN.elbowL; run.handL = DUAL_RUN.handL;
       }
       if (this.runOverride) for (const k of Object.keys(this.runOverride)) if (run[k]) run[k] = this.runOverride[k];
-      const w = Math.min(1, s * 1.8);
+      // foot-planted gaits need the full pose as soon as the character really moves (walkers run at s ~0.36)
+      const w = Math.min(1, s * (G ? 3.4 : 1.8));
       for (const k of Object.keys(run)) {
         const a = J[k], b = run[k];
         a[0] += (b[0] - a[0]) * w; a[1] += (b[1] - a[1]) * w; a[2] += (b[2] - a[2]) * w;
