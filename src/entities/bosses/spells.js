@@ -1,11 +1,23 @@
 // Vagel's spells that fly or spread: gold / violet bolts (they curve after the hero a little and burst on contact),
-// the Midas Wave (a ring of golden light that runs out over the floor — jump over it) and the golden chain of
-// Greed's Grasp. Ground telegraphs, lobbed orbs and pools come from hazards.js. Everything lives in one group.
+// the Midas Wave (a ring of golden light that runs out over the floor — jump over it), the golden chain of Greed's
+// Grasp, the giant coins of the Rain of Fortune and the Seraph Blades (walls of light turning around her). Ground
+// telegraphs, lobbed orbs and pools come from hazards.js. Everything lives in one group.
 import * as THREE from 'three';
 import { G } from '../../game/game.js';
 import { tex } from '../../core/textures.js';
 
+const TAU = Math.PI * 2;
 const _d = new THREE.Vector3(), _t = new THREE.Vector3(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
+// a blade of light: a wall, brightest at the floor, light running out along it; the tip and the inner end fade
+const BLADE_FS = `uniform vec3 uColor; uniform float uTime, uAlpha; varying vec2 vUv;
+  void main(){
+    float h = vUv.y;
+    float flow = 0.6 + 0.4 * sin(vUv.x * 46.0 - uTime * 11.0);
+    float glow = pow(1.0 - h, 1.6) * (0.55 + 0.45 * flow) + 0.35 * smoothstep(0.05, 0.0, abs(h - 0.02));
+    float ends = smoothstep(1.0, 0.92, vUv.x) * smoothstep(0.0, 0.05, vUv.x);
+    gl_FragColor = vec4(uColor * (1.2 + (1.0 - h) * 0.9), glow * ends * uAlpha);
+    #include <colorspace_fragment>
+  }`;
 
 // ring wall: an open cylinder, bright at the floor and fading upwards, with a band of moving light
 const WAVE_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
@@ -93,6 +105,43 @@ export class Spells {
     return it;
   }
 
+  // a giant gold coin dropping from high above onto (x, z): lands after `fall` s (onLand), then lies there, sinks away
+  coin(x, z, { r = 1.25, fall = 0.28, height = 16, onLand = null } = {}) {
+    if (!this.coinGeo) {
+      this.coinGeo = new THREE.CylinderGeometry(1, 1, 0.14, 32);
+      this.coinMat = new THREE.MeshStandardMaterial({ color: '#ffcc55', metalness: 0.55, roughness: 0.32, emissive: '#7a4e08', emissiveIntensity: 0.9 });
+    }
+    const m = new THREE.Mesh(this.coinGeo, this.coinMat);
+    const y = G.terrain.groundAt(x, z);
+    m.scale.set(r, r, r);
+    m.position.set(x, y + height, z);
+    m.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    m.castShadow = true;
+    this.group.add(m);
+    const it = { kind: 'coin', m, x, z, y, r, t: 0, fall, height, onLand, landed: false, spin: [4 + Math.random() * 6, 3 + Math.random() * 5] };
+    this.items.push(it);
+    return it;
+  }
+
+  // the Seraph Blades: n walls of light from (x, z) out to `len`; set(angle) turns them, fade() lets them go
+  blades(x, z, n, { len = 27, inner = 1.4, height = 2.8, color = '#fff0b0' } = {}) {
+    const g = new THREE.Group();
+    g.position.set(x, G.terrain.groundAt(x, z), z);
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: WAVE_VS, fragmentShader: BLADE_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+      uniforms: { uColor: { value: new THREE.Color(color) }, uTime: { value: 0 }, uAlpha: { value: 0 } },
+    });
+    const geo = new THREE.PlaneGeometry(len - inner, height).translate((len + inner) / 2, height / 2, 0);
+    const walls = [];
+    for (let k = 0; k < n; k++) { const w = new THREE.Mesh(geo, mat); w.frustumCulled = false; w.renderOrder = 6; g.add(w); walls.push(w); }
+    this.group.add(g);
+    const it = { kind: 'blades', g, mat, geo, walls, n, t: 0, fading: -1 };
+    it.set = (ang) => walls.forEach((w, k) => { w.rotation.y = -(ang + (k / n) * TAU); });
+    it.fade = () => { if (it.fading < 0) it.fading = 0; };
+    this.items.push(it);
+    return it;
+  }
+
   remove(it) { it.dead = true; }
 
   burst(pos, color, n = 22) {
@@ -158,15 +207,39 @@ export class Spells {
         it.mat.uniforms.uLen.value = len;
         it.mat.uniforms.uTime.value = this.t;
         it.mat.uniforms.uAlpha.value = Math.min(1, it.t / 0.2);
+      } else if (it.kind === 'coin') {
+        if (!it.landed) {
+          const k = Math.min(1, it.t / it.fall);
+          it.m.position.y = it.y + it.height * (1 - k * k);
+          it.m.rotation.x += dt * it.spin[0]; it.m.rotation.z += dt * it.spin[1];
+          if (k >= 1) {
+            it.landed = true; it.t0 = it.t;
+            it.m.rotation.set((Math.random() - 0.5) * 0.25, Math.random() * TAU, (Math.random() - 0.5) * 0.25);
+            it.m.position.y = it.y + 0.07 * it.r;
+            it.onLand && it.onLand(it);
+          }
+        } else {
+          // it rings a moment on the floor, then sinks away
+          const u = it.t - it.t0;
+          it.m.rotation.x *= Math.exp(-6 * dt); it.m.rotation.z *= Math.exp(-6 * dt);
+          if (u > 1.4) it.m.position.y = it.y + 0.07 * it.r - (u - 1.4) * 0.5;
+          if (u > 2.1) it.dead = true;
+        }
+      } else if (it.kind === 'blades') {
+        it.mat.uniforms.uTime.value = this.t;
+        if (it.fading >= 0) { it.fading += dt; if (it.fading > 0.5) it.dead = true; }
+        it.mat.uniforms.uAlpha.value = Math.min(1, it.t / 0.35) * (it.fading >= 0 ? Math.max(0, 1 - it.fading / 0.5) : 1);
       }
     }
   }
 
   dispose(it) {
-    if (it.g) { it.g.removeFromParent(); it.orb.material.dispose(); it.glow.material.dispose(); }
+    if (it.kind === 'bolt') { it.g.removeFromParent(); it.orb.material.dispose(); it.glow.material.dispose(); }
     if (it.wall) { it.wall.removeFromParent(); it.wall.geometry.dispose(); it.mat.dispose(); }
     if (it.kind === 'chain') { it.m.removeFromParent(); it.m.geometry.dispose(); it.mat.dispose(); }
+    if (it.kind === 'coin') it.m.removeFromParent();
+    if (it.kind === 'blades') { it.g.removeFromParent(); it.geo.dispose(); it.mat.dispose(); }
   }
   clear() { for (const it of this.items) this.dispose(it); this.items.length = 0; }
-  destroy() { this.clear(); this.group.removeFromParent(); this.orbGeo.dispose(); }
+  destroy() { this.clear(); this.group.removeFromParent(); this.orbGeo.dispose(); if (this.coinGeo) { this.coinGeo.dispose(); this.coinMat.dispose(); } }
 }

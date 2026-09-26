@@ -595,6 +595,8 @@ export class Animator {
     this.velocity = new THREE.Vector3();
     this.lookYaw = 0;
     this.poseHook = null;   // optional (basePose, dt) => void, runs after locomotion, before actions are blended in
+    this.crossfade = false; // blend interrupted clips into the next one (see play) instead of cutting
+    this.shown = emptyPose();
   }
 
   setStyle(style) {
@@ -609,11 +611,20 @@ export class Animator {
     let clip = CLIPS[name];
     if (!clip) return null;
     if (this.style !== 'sword' && STYLE_POSES[this.style] && !name.startsWith(this.style + '_') && !name.startsWith('mc_')) clip = restyleClip(clip, this.style);
-    this.action = { clip, t: 0, speed, weight: this.action ? this.action.weight : 0, fadeIn, fadeOut, onEvent, fired: new Set(), done: false };
+    const prev = this.action;
+    this.action = { clip, t: 0, speed, weight: prev ? prev.weight : 0, fadeIn, fadeOut, onEvent, fired: new Set(), done: false };
+    // (crossfade: a clip that interrupts another starts from the pose shown right now instead of jumping)
+    if (this.crossfade && prev && !prev.done && prev.weight > 0.02) {
+      const from = emptyPose();
+      copyPose(this.shown, from);
+      Object.assign(this.action, { weight: 1, from, xf: Math.max(fadeIn, 0.22) });
+    }
     return this.action;
   }
   get busy() { return !!(this.action && !this.action.done && this.action.t < this.action.clip.duration - this.action.fadeOut * 0.5); }
   stop() { if (this.action) this.action.done = true; }
+  // a soft stop: the running clip fades out over `fade` seconds
+  release(fade = 0.3) { const a = this.action; if (a && !a.done && !a.release) { a.release = fade; a.relT = 0; } }
 
   die() { this.dead = true; this.play(this.mocap && CLIPS.mc_Death01 ? 'mc_Death01' : 'death'); }
   revive() { this.dead = false; this.action = null; }
@@ -925,10 +936,12 @@ export class Animator {
       else a.weight = 1;
       const endT = c.duration;
       if (!c.loop && !this.dead && a.t > endT - a.fadeOut) a.weight = Math.max(0, (endT - a.t) / a.fadeOut);
+      if (a.release) { a.relT += dt; a.weight = Math.min(a.weight, Math.max(0, 1 - a.relT / a.release)); }
       for (const ev of c.events) {
         if (a.t >= ev.t && !a.fired.has(ev)) { a.fired.add(ev); a.onEvent && a.onEvent(ev.name); }
       }
       c.sample(Math.min(a.t, c.duration), this.act);
+      if (a.from && a.t < a.xf) blendPose(a.from, this.act, smoothstep(0, a.xf, a.t), this.act);
       // root motion extraction (unweighted, horizontal)
       const r = this.act.root;
       if (!a.prevRoot) a.prevRoot = [0, 0, 0];
@@ -939,6 +952,7 @@ export class Animator {
         if (c.loop) a.t %= endT;
         else if (!this.dead) { a.done = true; a.onEvent && a.onEvent('end'); }
       }
+      if (a.release && a.relT >= a.release && !this.dead) a.done = true;
       if (!a.done || this.dead) {
         blendPose(this.base, this.act, this.dead ? 1 : a.weight, this.out);
         pose = this.out;
@@ -952,6 +966,7 @@ export class Animator {
       const r = pose[name];
       J[name].rotation.set(r[0], r[1], r[2], 'YXZ');
     }
+    if (this.crossfade) copyPose(pose, this.shown);
     const ks = this.rig.hipY / 0.64;
     J.hips.position.set(pose.pos[0] * ks, this.rig.hipY + pose.pos[1] * ks, pose.pos[2] * ks);
     if (!(a && !a.done)) this.rootDelta.set(0, 0, 0);

@@ -267,6 +267,11 @@ export const MONSTERS = {
     speed: 3.4, range: 12, atkCd: 2.1, aggressive: true, aggroRange: 0, leash: 80, respawn: 300, boss: true,
     drops: [['vagel_coin', 1], ['ring_avarice', 0.4], ['twin_avarice', 0.3], ['hp_potion_l', 1], ['sp_potion_l', 0.8], ['knight_plate', 0.12]],
   },
+  // her golden illusions in the vault (from 60%): they throw bolts, shatter at any blow and drop nothing
+  vagel_image: {
+    name: 'Avatar of Greed', baseLv: 18, hp: 1, atk: [44, 58], def: 0, exp: 0, copper: [0, 0],
+    speed: 0, range: 12, atkCd: 3, aggressive: false, leash: 80, respawn: 9999, drops: [],
+  },
 };
 
 export function monsterStats(type, lv) {

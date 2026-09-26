@@ -118,7 +118,7 @@ export class HUD {
     const bbar = el('div', 'bb-bar', bb);
     this.bossLag = el('div', 'bb-lag', bbar);
     this.bossFill = el('div', 'bb-fill', bbar);
-    this.bossMarks = [el('i', 'bb-mark', bbar), el('i', 'bb-mark', bbar)];   // (where the fight changes: boss.barMarks)
+    this.bossMarks = [0, 1, 2].map(() => el('i', 'bb-mark', bbar));   // (where the fight changes: boss.barMarks)
     this.bossPct = el('span', '', bbar, '');
 
     // ---------------- minimap

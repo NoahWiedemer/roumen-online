@@ -1,8 +1,11 @@
 // Vagel, Goddess of Greed — the model: the user's Vagel.glb (auto-rigged, see SPECS.vagel in npcModels.js) driven by
-// the Animator with the motion-capture clips (sitting, talking, casting, death) and a few spell poses of her own.
-// Implements the monster model interface of monsters.js. In a fight she levitates (toes pointed, hands floating
-// out from the body, a slow bob), her hands glow while she casts, a golden halo burns behind her head when she is
-// enraged, a blink squeezes her into a sliver of light and back, and when she falls she dissolves into gold.
+// the Animator with the motion-capture clips (sitting, standing up, death) and spell poses of her own (casting with
+// either hand or both, raising, spreading, grasping, sweeping, ascending, splitting). Clips that interrupt each other
+// cross-fade. Implements the monster model interface of monsters.js. In a fight she levitates (toes pointed, hands
+// floating out from the body, a slow bob, a tilt into her drift), her hands glow while she casts, a golden halo burns
+// behind her head when she is enraged, a blink squeezes her into a sliver of light and back, and when she falls she
+// dissolves into gold. (The model's skin weights were corrected so her chest no longer balloons when she raises or
+// spreads her arms, and her long cloak falls from the arms to the hips instead of swinging out like a board.)
 import * as THREE from 'three';
 import { Clip, CLIPS, Animator, fullPose } from '../anim.js';
 import { createNpcRig, preloadNpcModel, npcModelReady } from '../npcModels.js';
@@ -74,6 +77,35 @@ CLIPS.vg_point = new Clip('vg_point', {
   duration: 1.8, base: P_VAGEL, curve: 'smooth',
   keys: [{ t: 0, ...P_VAGEL }, { t: 0.35, stop: true, armR: [-1.45, 0.1, -0.12], elbowR: [-0.1, 0, 0], handR: [0.2, 0, 0], head: [0.05, 0, 0.1] }, { t: 1.4, stop: true, armR: [-1.4, 0.1, -0.12], elbowR: [-0.15, 0, 0], handR: [0.2, 0, 0] }, { t: 1.8, ...P_VAGEL }],
 });
+// casting a bolt while she floats upright: the hand draws back beside the head, then throws forward, palm out
+// (the bolt leaves at 0.3 s). R = right hand (gold), L = left hand (violet), 2 = both hands from the chest
+const mirror = (P) => Object.fromEntries(Object.entries(P).map(([ch, v]) => {
+  const to = ch.endsWith('R') ? ch.slice(0, -1) + 'L' : ch.endsWith('L') ? ch.slice(0, -1) + 'R' : ch;
+  return [to, [v[0], -v[1], -v[2]]];
+}));
+const CAST_BACK = { armR: [-2.15, -0.35, -0.3], elbowR: [-1.25, 0, 0], handR: [0.25, 0, -0.1], chest: [-0.05, 0.16, 0], spine: [-0.03, 0.06, 0], head: [0.02, -0.1, 0] };
+const CAST_OUT = { armR: [-1.55, 0.12, -0.08], elbowR: [-0.08, 0, 0], handR: [-0.35, 0, 0], chest: [0.04, -0.18, 0], spine: [-0.02, -0.06, 0], head: [0.06, 0.08, 0] };
+const castKeys = (back, out) => [
+  { t: 0, ...P_VAGEL }, { t: 0.2, stop: true, ...back }, { t: 0.32, ...out }, { t: 0.5, stop: true, ...out, elbowR: out.elbowR && [-0.25, 0, 0], elbowL: out.elbowL && [-0.25, 0, 0] }, { t: 0.85, ...P_VAGEL },
+].map((k) => Object.fromEntries(Object.entries(k).filter(([, v]) => v !== undefined)));
+CLIPS.vg_cast = new Clip('vg_cast', { duration: 0.85, base: P_VAGEL, curve: 'smooth', keys: castKeys(CAST_BACK, CAST_OUT) });
+CLIPS.vg_castL = new Clip('vg_castL', { duration: 0.85, base: P_VAGEL, curve: 'smooth', keys: castKeys(mirror(CAST_BACK), mirror(CAST_OUT)) });
+const CAST2_IN = { armL: [-0.95, 0.55, 0.3], elbowL: [-1.9, 0, 0], armR: [-0.95, -0.55, -0.3], elbowR: [-1.9, 0, 0], chest: [-0.12, 0, 0], head: [-0.05, 0, 0] };
+const CAST2_OUT = { armL: [-1.5, -0.18, 0.14], elbowL: [-0.1, 0, 0], handL: [-0.3, 0, 0], armR: [-1.5, 0.18, -0.14], elbowR: [-0.1, 0, 0], handR: [-0.3, 0, 0], chest: [0.06, 0, 0], head: [0.05, 0, 0] };
+CLIPS.vg_cast2 = new Clip('vg_cast2', { duration: 0.9, base: P_VAGEL, curve: 'smooth', keys: castKeys(CAST2_IN, CAST2_OUT) });
+// ascending in glory (the Seraph Blades): arms open low at her sides, palms out, head raised
+const GLORY = { armL: [0.08, 0, 0.8], elbowL: [-0.25, 0, 0], handL: [0, 0, 0.45], armR: [0.08, 0, -0.8], elbowR: [-0.25, 0, 0], handR: [0, 0, -0.45], spine: [-0.06, 0, 0], chest: [-0.16, 0, 0], head: [-0.28, 0, 0] };
+CLIPS.vg_ascend = new Clip('vg_ascend', {
+  duration: 7.4, base: P_VAGEL, curve: 'smooth',
+  keys: [{ t: 0, ...P_VAGEL }, { t: 0.9, stop: true, ...GLORY }, { t: 3.6, ...GLORY, chest: [-0.2, 0.05, 0], head: [-0.32, 0.06, 0] }, { t: 6.6, stop: true, ...GLORY }, { t: 7.4, ...P_VAGEL }],
+});
+// splitting into her avatars: palms together before the chest, then flung open
+const PALMS = { armL: [-1.25, -0.55, 0.1], elbowL: [-1.3, 0, 0], armR: [-1.25, 0.55, -0.1], elbowR: [-1.3, 0, 0], chest: [0.05, 0, 0], head: [0.12, 0, 0] };
+const OPEN = { armL: [-0.75, 0.3, 1.0], elbowL: [-0.15, 0, 0], handL: [0, 0, 0.4], armR: [-0.75, -0.3, -1.0], elbowR: [-0.15, 0, 0], handR: [0, 0, -0.4], chest: [-0.18, 0, 0], head: [-0.22, 0, 0] };
+CLIPS.vg_split = new Clip('vg_split', {
+  duration: 2.2, base: P_VAGEL, curve: 'smooth',
+  keys: [{ t: 0, ...P_VAGEL }, { t: 0.55, stop: true, ...PALMS }, { t: 0.85, ...OPEN }, { t: 1.7, stop: true, ...OPEN }, { t: 2.2, ...P_VAGEL }],
+});
 
 // motion-capture clips with the legs held in the levitating pose (casting while hovering)
 function hoverClip(name, src, speed = 1) {
@@ -121,10 +153,10 @@ export class VagelModel {
     this.type = type;
     this.rig = createNpcRig('vagel', { name: 'monster:vagel' });
     this.anim = new Animator(this.rig, { idlePose: P_VAGEL, gait: 'free' });
+    this.anim.crossfade = true;               // (a spell interrupting another blends over instead of jumping)
     if (mocapReady()) {
       this.anim.useMocap(getMocap());
       this.anim.walkOnly = true;
-      if (!CLIPS.vg_cast && CLIPS.mc_Spell_Simple_Shoot) hoverClip('vg_cast', CLIPS.mc_Spell_Simple_Shoot, 0.8);
       if (!CLIPS.vg_talk && CLIPS.mc_Idle_Talking_Loop) { hoverClip('vg_talk', CLIPS.mc_Idle_Talking_Loop); CLIPS.vg_talk.loop = true; }
     }
     this.anim.poseHook = (J, dt) => this.posture(J, dt);
@@ -142,7 +174,10 @@ export class VagelModel {
     this.t = Math.random() * 10;
     this.hover = 0; this.hoverTarget = 1;     // 0 standing / sitting .. 1 levitating
     this.lift = 0;                            // metres above the floor (the boss adds it to the root)
+    this.rise = 0; this.riseTarget = 0;       // extra height (she ascends for the Seraph Blades)
+    this.lean = [0, 0]; this.leanTarget = [0, 0];   // tilt into her drift (forwards, sideways)
     this.flinchT = -1; this.flinchDir = 1;
+    this.baseOpacity = 1;
     this.hl = 0; this.hlTarget = 0; this.flash = 0;
     this.cast = [0, 0]; this.castTarget = [0, 0];   // hand glow [right (gold), left (violet)]
     this.rage = 0; this.rageTarget = 0;             // the golden halo
@@ -174,7 +209,7 @@ export class VagelModel {
     if (this.deathT >= 0 || !CLIPS[name]) return null;
     return this.anim.play(name, { fadeIn: 0.2, fadeOut: 0.3, ...opts });
   }
-  stopAction() { this.anim.stop(); }
+  stopAction(fade = 0.3) { this.anim.release(fade); }
   // sitting on the throne (talking = gesturing while she speaks)
   sit(talking = false) {
     this.hoverTarget = 0; this.hover = 0;
@@ -190,6 +225,9 @@ export class VagelModel {
     else if (!on && this.anim.action && this.anim.action.clip === CLIPS.vg_talk) this.anim.stop();
   }
   setHover(on) { this.hoverTarget = on ? 1 : 0; }
+  setRise(m) { this.riseTarget = m; }
+  // her drift in her own frame (m/s forwards / to her right): she tilts into it a little
+  setDrift(fwd, side) { this.leanTarget[0] = clamp(fwd * 0.07, -0.14, 0.14); this.leanTarget[1] = clamp(side * 0.07, -0.14, 0.14); }
   setCast(right, left = 0) { this.castTarget[0] = right; this.castTarget[1] = left; }
   setRage(on) { this.rageTarget = on ? 1 : 0; }
   handWorld(side, out = new THREE.Vector3()) {
@@ -235,16 +273,18 @@ export class VagelModel {
       const o = J[ch];
       o[0] += (v[0] - o[0]) * k; o[1] += (v[1] - o[1]) * k; o[2] += (v[2] - o[2]) * k;
     }
-    // a slow sway while she floats
+    // a slow sway while she floats, and a tilt into her drift
     const s = Math.sin(this.t * 1.3) * 0.04 * k;
     J.armL[2] += s; J.armR[2] += s; J.spine[2] += s * 0.4; J.head[1] += Math.sin(this.t * 0.7) * 0.05 * k;
+    J.spine[0] += this.lean[0]; J.chest[0] += this.lean[0] * 0.5; J.spine[2] += this.lean[1]; J.head[2] -= this.lean[1] * 0.5;
+    // a hit: a small recoil of head and shoulders (she barely deigns to notice)
     if (this.flinchT >= 0) {
       this.flinchT += dt;
-      const f = this.flinchT < 0.08 ? this.flinchT / 0.08 : Math.max(0, 1 - (this.flinchT - 0.08) / 0.35);
+      const f = this.flinchT < 0.1 ? this.flinchT / 0.1 : Math.max(0, 1 - (this.flinchT - 0.1) / 0.4);
       const q = f * f * (3 - 2 * f) * this.flinchDir;
-      J.spine[0] -= 0.18 * q; J.chest[0] -= 0.12 * q; J.head[0] -= 0.25 * q; J.head[1] += 0.15 * q;
-      J.armL[2] += 0.25 * q; J.armR[2] -= 0.25 * q;
-      if (this.flinchT > 0.45) this.flinchT = -1;
+      J.spine[0] -= 0.09 * q; J.chest[0] -= 0.07 * q; J.head[0] -= 0.14 * q; J.head[1] += 0.08 * q;
+      J.armL[2] += 0.06 * q; J.armR[2] -= 0.06 * q;
+      if (this.flinchT > 0.5) this.flinchT = -1;
     }
   }
 
@@ -253,7 +293,10 @@ export class VagelModel {
     this.t += dt;
     const hk = 1 - Math.exp(-3.5 * dt);
     this.hover += (this.hoverTarget - this.hover) * hk;
-    this.lift = this.hover * (0.34 + Math.sin(this.t * 1.6) * 0.07) * this.k;
+    this.rise += (this.riseTarget - this.rise) * (1 - Math.exp(-1.8 * dt));
+    const lk = 1 - Math.exp(-4 * dt);
+    this.lean[0] += (this.leanTarget[0] - this.lean[0]) * lk; this.lean[1] += (this.leanTarget[1] - this.lean[1]) * lk;
+    this.lift = this.hover * (0.34 + Math.sin(this.t * 1.6) * 0.07) * this.k + this.rise;
     this.anim.speed = 0;
     this.anim.groundSpeed = 0;
     this.anim.update(dt, null);
@@ -288,7 +331,7 @@ export class VagelModel {
       if (this.deathT > this.lingerTime) {
         const f = clamp((this.deathT - this.lingerTime) / this.fadeDur, 0, 1);
         if (!this.mat.transparent) { this.mat.transparent = true; this.mat.needsUpdate = true; this.rig.skinned.castShadow = false; }
-        this.mat.opacity = 1 - f;
+        this.mat.opacity = this.baseOpacity * (1 - f);
         if (f >= 1) { this.dead = true; this.root.visible = false; }
       }
     }
@@ -298,5 +341,37 @@ export class VagelModel {
     this.mat.dispose();
     for (const s of [...this.handGlow, this.halo]) s.material.dispose();
     this.root.parent?.remove(this.root);
+  }
+}
+
+// An Avatar of Greed: one of the golden illusions she splits into — translucent, glowing gold, no halo. It shatters
+// at the first blow (a quick fade instead of her long dissolve).
+export class VagelImageModel extends VagelModel {
+  constructor(type) {
+    super(type);
+    const m = this.mat;
+    m.transparent = true;
+    m.color.set('#ffd98a');
+    m.emissive.set('#a06a14');
+    m.emissiveIntensity = 1;
+    m.needsUpdate = true;
+    this.baseEmissive = m.emissive.clone();
+    this.baseOpacity = 0.6;
+    m.opacity = this.baseOpacity;
+    this.rig.skinned.castShadow = false;
+    this.halo.visible = false;
+    this.collapseDur = 0.2; this.lingerTime = 0.05; this.fadeDur = 0.45;
+  }
+  die() {
+    if (this.deathT >= 0) return;
+    this.deathT = 0;
+    this.hoverTarget = 1;
+    this.castTarget = [0, 0];
+    this.anim.stop();
+  }
+  update(dt) {
+    super.update(dt);
+    // a shimmer runs through the illusion
+    if (this.deathT < 0) this.mat.opacity = this.baseOpacity * (0.85 + 0.15 * Math.sin(this.t * 4.3));
   }
 }
