@@ -32,8 +32,11 @@ function resolveKeys(keys, base) {
 }
 
 export class Clip {
+  // opts.curve = 'smooth': the keys are passed through with a cubic (Catmull-Rom) curve, so the motion keeps its
+  // momentum through the keys instead of stopping at each one; keys marked `stop: true` (and the first / last key)
+  // are held with zero velocity (impacts, the peak of a wind-up)
   constructor(name, opts) {
-    const { duration, keys, loop = false, events = [], base = null, expression = null, sword = null } = opts;
+    const { duration, keys, loop = false, events = [], base = null, expression = null, sword = null, curve = null } = opts;
     this.opts = opts;       // kept so a clip can be re-based for another weapon style (see restyleClip)
     this.name = name;
     this.duration = duration;
@@ -42,6 +45,21 @@ export class Clip {
     this.events = events; // [{t, name}]
     this.expression = expression;
     this.sword = sword; // [tStart, tEnd] window where the weapon trail is on
+    if (curve === 'smooth') {
+      const K = this.keys;
+      K.forEach((k, i) => { k.stop = !!keys[i].stop; });
+      // per key and channel: slope in units per second (finite difference of the neighbours)
+      for (let i = 0; i < K.length; i++) {
+        const k = K[i];
+        k.m = {};
+        for (const ch of CHANNELS) {
+          if (i === 0 || i === K.length - 1 || k.stop) { k.m[ch] = [0, 0, 0]; continue; }
+          const p = K[i - 1], n = K[i + 1], dt = Math.max(1e-4, n.t - p.t);
+          k.m[ch] = [0, 1, 2].map((c) => (n[ch][c] - p[ch][c]) / dt);
+        }
+      }
+      this.smooth = true;
+    }
   }
   sample(t, out) {
     const K = this.keys;
@@ -50,6 +68,18 @@ export class Clip {
     let i = 0;
     while (i < K.length - 1 && K[i + 1].t < t) i++;
     const a = K[i], b = K[i + 1];
+    if (this.smooth) {
+      // cubic Hermite between a and b with the keys' slopes
+      const d = Math.max(1e-5, b.t - a.t), u = (t - a.t) / d, u2 = u * u, u3 = u2 * u;
+      const h00 = 2 * u3 - 3 * u2 + 1, h10 = (u3 - 2 * u2 + u) * d, h01 = -2 * u3 + 3 * u2, h11 = (u3 - u2) * d;
+      for (const ch of CHANNELS) {
+        const pa = a[ch], pb = b[ch], ma = a.m[ch], mb = b.m[ch], o = out[ch];
+        o[0] = h00 * pa[0] + h10 * ma[0] + h01 * pb[0] + h11 * mb[0];
+        o[1] = h00 * pa[1] + h10 * ma[1] + h01 * pb[1] + h11 * mb[1];
+        o[2] = h00 * pa[2] + h10 * ma[2] + h01 * pb[2] + h11 * mb[2];
+      }
+      return out;
+    }
     const u = ease[b.e]((t - a.t) / Math.max(1e-5, b.t - a.t));
     for (const ch of CHANNELS) {
       const pa = a[ch], pb = b[ch], o = out[ch];
@@ -548,6 +578,7 @@ export class Animator {
     this.accel = new THREE.Vector3();
     this.velocity = new THREE.Vector3();
     this.lookYaw = 0;
+    this.poseHook = null;   // optional (basePose, dt) => void, runs after locomotion, before actions are blended in
   }
 
   setStyle(style) {
@@ -601,7 +632,8 @@ export class Animator {
     // moving: walk <-> jog
     const walk = C.Walk_Loop, run = C.Jog_Fwd_Loop, mw = M.Walk_Loop, mr = M.Jog_Fwd_Loop;
     const natW = Math.max(0.3, mw.speedLeg * legW), natR = Math.max(1, mr.speedLeg * legW);
-    const k = clamp((gv - natW * 1.15) / (natR * 0.7 - natW * 1.15), 0, 1);
+    // walk -> jog blend (heavy walkers set walkOnly: they stride faster instead of breaking into a jog)
+    const k = this.walkOnly ? 0 : clamp((gv - natW * 1.15) / (natR * 0.7 - natW * 1.15), 0, 1);
     const rateW = clamp(gv / natW, 0.6, 1.9), rateR = clamp(gv / natR, 0.7, 1.6);
     const f = lerp(rateW / walk.duration, rateR / run.duration, k);   // gait cycles per second
     const mc = this.mc;
@@ -864,6 +896,7 @@ export class Animator {
     this.ride += (this.rideTarget - this.ride) * (1 - Math.exp(-12 * dt));
     this.air += ((this.inAir ? 1 : 0) - this.air) * (1 - Math.exp(-(this.inAir ? 12 : 20) * dt));
     if (this.mocap) this.mocapLocomotion(dt); else this.locomotion(dt);
+    if (this.poseHook) this.poseHook(this.base, dt);   // controllers layer their own posture on the locomotion pose
 
     let pose = this.base;
     const a = this.action;

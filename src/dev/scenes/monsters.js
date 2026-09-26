@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { createMonsterModel, MONSTER_TYPES, warmupMonsters, preloadMonsterAssets } from '../../entities/monsterModels.js';
 import { makeCanvas, toTexture } from '../../core/textures.js';
 import { preloadNpcModels } from '../../entities/npcModels.js';
+import { preloadMocap } from '../../entities/mocap.js';
 
 function label(text, sub) {
   const c = makeCanvas(512, 128);
@@ -62,6 +63,7 @@ export default async function (ctx) {
   try {
     await preloadMonsterAssets();
     await preloadNpcModels(['ratman_mob', 'eber']);                 // skinned monsters (rat-men, Hammer Boar)
+    if (q.get('mocap') !== '0') await preloadMocap();                // motion clips (the Hammer Boar moves with them)
     const only = q.get('only');
     const types = only ? only.split(',') : MONSTER_TYPES;
     const state = q.get('state') || 'idle';

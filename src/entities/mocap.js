@@ -85,9 +85,12 @@ function bakeLibrary(gltf) {
     const keys = [];
     let prev = null;
     let footSpeed = 0, minFootY = Infinity;
+    // (the mixer repeats clips: sampling exactly at the end would wrap one-shot clips back to their first frame,
+    // e.g. a death clip standing up again in its last key)
+    const loops = /_Loop$/.test(anim.name);
     for (let i = 0; i < n; i++) {
       const t = Math.min(anim.duration, (i / (n - 1)) * anim.duration);
-      mixer.setTime(t);
+      mixer.setTime(loops ? t : Math.min(t, anim.duration - 1e-4));
       scene.updateMatrixWorld(true);
       const key = { t, e: 'linear' };
       for (const [joint, name] of Object.entries(MAP)) qW[joint].multiplyQuaternions(wq(bones[name]), offsetInv[joint]);

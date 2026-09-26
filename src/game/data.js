@@ -240,7 +240,7 @@ export const MONSTERS = {
   // hits hard; neutral until attacked. Tier 1 and 2 of the hill
   hammer_boar: {
     name: 'Hammer Boar', model: 'eber', baseLv: 8, hp: 340, atk: [36, 46], def: 12, exp: 62, copper: [45, 85],
-    speed: 2.3, range: 2.4, atkCd: 3.6, aggressive: false, leash: 24, respawn: 24,
+    speed: 2.1, range: 2.4, atkCd: 3.8, aggressive: false, leash: 24, respawn: 24,
     drops: [['boar_tusk', 0.45], ['boar_hide', 0.35], ['hp_potion_m', 0.1], ['sp_potion_m', 0.06], ['pants_plate', 0.015], ['boots_plate', 0.015]],
   },
   kingslime: {
