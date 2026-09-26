@@ -230,6 +230,7 @@ export class CumbotModel extends MonsterBase {
     if (!T) throw new Error('Cumbot model not loaded yet — await preloadCumbot() first');
     this.height = GAME_HEIGHT; this.radius = 1.6; this.headY = GAME_HEIGHT * 0.86;
     this.collapseDur = 16; this.fadeDur = 2.5;          // shuts down, stays slumped for a while, then fades
+    this.lingerTime = this.collapseDur;                  // (monsters.js removes the body only after linger + fade)
     this.impactTime = ACTIONS.punchR.hit; this.attackDur = ACTIONS.punchR.dur;
     this.tankGlow = { value: 0.15 };
     const mat = this.inst(T.material, { rim: ['#ffe8f0', 0.18, 2.6] });

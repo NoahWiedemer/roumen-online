@@ -244,7 +244,7 @@ export const MONSTERS = {
   // mid boss in front of the Tower of Isel (AI + mechanics: entities/bosses/cumbot.js). leash = arena radius
   cumbot: {
     name: 'Cumbot 9000', baseLv: 15, hp: 5200, atk: [34, 46], def: 18, exp: 1800, copper: [2500, 4200], speed: 3.1, range: 2.2, atkCd: 2.8,
-    aggressive: true, aggroRange: 13, leash: 30, respawn: 300, boss: true,
+    aggressive: true, aggroRange: 13, leash: 30, respawn: 120, boss: true,        // respawn counted from the knockout
     drops: [['cumbot_core', 1], ['hp_potion_l', 0.7], ['sp_potion_l', 0.5], ['knight_helm', 0.15], ['ring_ruby', 0.2], ['necklace_jade', 0.25]],
   },
 };

@@ -339,7 +339,12 @@ export class CumbotBoss extends Monster {
   // ---------------------------------------------------------------- per frame
   update(dt) {
     if (this.removed) return;
-    if (this.dead) { this.deadFx(dt); this.hz?.update(dt); super.update(dt); if (this.removed) this.hz?.destroy(); return; }
+    if (this.dead) {
+      this.deadFx(dt); this.hz?.update(dt); super.update(dt);
+      // he lies slumped for a while first: the respawn time counts from the knockout, not from the fade-out
+      if (this.removed) { this.respawnT = Math.max(5, this.def.respawn - this.deathT); this.hz?.destroy(); }
+      return;
+    }
     const m = this.model, p = G.player;
     for (let i = this.debuffs.length - 1; i >= 0; i--) {
       const d = this.debuffs[i];
