@@ -82,6 +82,8 @@ export function enterWorld(world, at = null) {
     G.cam.terrain = world.terrain;
     G.cam.setBlockers(world.colliders, world.terrain);
     addPortalBlockers(G.cam, world.portals || []);
+    if (world.camBlockers) G.cam.blockers.push(...world.camBlockers);
+    G.cam.ceiling = world.cameraCeiling || null;
     if (p) { G.cam.yaw = at && at.camYaw !== undefined ? at.camYaw : p.rotY + Math.PI; G.cam.snap(p.pos); }
   }
   if (G.loot) G.loot.clear();

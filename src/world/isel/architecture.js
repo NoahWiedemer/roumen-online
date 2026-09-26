@@ -236,12 +236,22 @@ function pathWell(b, bp, M, p) {
         bp.box(M.stone, pm(cxs, top - 0.07, czs, 0, Math.atan2(ux, uz), 0), W - 0.2, 0.14, run + 0.1, { uv: 'frame', uvs: 0.5, color: [0.97, 1, 1.02], ao: false });
       }
     } else {
-      // flat floor, clipped to the core for the tunnels out to the outer stair
-      let tEnd = L;
-      if (p.core) { tEnd = 0; while (tEnd < L && Math.hypot(ax + ux * tEnd - CORE.x, az + uz * tEnd - CORE.z) < CORE.r) tEnd += 0.1; }
-      const ex = ax + ux * tEnd, ez = az + uz * tEnd, ey = ay + rise * (tEnd / L);
-      b.quadN(M.wood, V(ax + nx * hw, ay, az + nz * hw), V(ex + nx * hw, ey, ez + nz * hw), V(ex - nx * hw, ey, ez - nz * hw), V(ax - nx * hw, ay, az - nz * hw),
-        [0, dist * 0.6], [0, (dist + tEnd) * 0.6], [W * 0.6, (dist + tEnd) * 0.6], [W * 0.6, dist * 0.6], [0.95, 0.82, 0.66], V(0, 1, 0), false);
+      // flat floor, clipped to the core for the tunnels out to / in from the outer stair (the part of the segment
+      // inside the round tower, whichever end the path starts from)
+      let t0 = 0, t1 = L;
+      if (p.core) {
+        const inside = (t) => Math.hypot(ax + ux * t - CORE.x, az + uz * t - CORE.z) < CORE.r;
+        while (t0 < L && !inside(t0)) t0 += 0.05;
+        t1 = t0;
+        while (t1 < L && inside(t1)) t1 += 0.05;
+        t1 = Math.min(t1, L);
+      }
+      const sx = ax + ux * t0, sz = az + uz * t0, sy = ay + rise * (t0 / L);
+      const ex = ax + ux * t1, ez = az + uz * t1, ey = ay + rise * (t1 / L);
+      if (t1 - t0 > 0.01) {
+        b.quadN(M.wood, V(sx + nx * hw, sy, sz + nz * hw), V(ex + nx * hw, ey, ez + nz * hw), V(ex - nx * hw, ey, ez - nz * hw), V(sx - nx * hw, sy, sz - nz * hw),
+          [0, (dist + t0) * 0.6], [0, (dist + t1) * 0.6], [W * 0.6, (dist + t1) * 0.6], [W * 0.6, (dist + t0) * 0.6], [0.95, 0.82, 0.66], V(0, 1, 0), false);
+      }
     }
     // walls, ceiling, rails and lamps in 1 m pieces
     const n = Math.ceil(L);

@@ -179,8 +179,9 @@ function pillar(K, x, y, z, h, r) {
 
 // iron ring chandelier with candles and a blue crystal, hanging from the ceiling at yc
 function chandelier(K, x, yc, z, R, drop) {
-  // (no shadows: the long thin chains only drew flickering lines across the floor)
-  const { M, T, D } = K, b = K.bn, y = yc - drop;
+  // its own meshes (no shadows: the long thin chains only drew flickering lines across the floor), hidden while the
+  // camera looks down on it from above (it would hang right in front of the view)
+  const { M, T, D } = K, b = new GeoBuilder(), glow = new Glow(), y = yc - drop;
   b.geo(M.iron, U.cyl(6), pm(x, (yc + y + 1.3) / 2, z, 0, 0, 0, 0.05, yc - y - 1.3, 0.05), {});
   b.geo(M.iron, U.sphere(10, 7), pm(x, y + 1.3, z, 0, 0, 0, 0.32, 0.32, 0.32), {});
   const tube = Math.round((0.075 / R) * 1000) / 1000;
@@ -199,11 +200,17 @@ function chandelier(K, x, yc, z, R, drop) {
     const a = (i / n) * TAU, cx = x + Math.cos(a) * R, cz = z + Math.sin(a) * R;
     b.geo(M.cream, U.cyl(6), pm(cx, y + 0.2, cz, 0, 0, 0, 0.055, 0.34, 0.055), { color: [1, 0.96, 0.86] });
     b.geo(T.lamp, U.sphere(6, 4), pm(cx, y + 0.45, cz, 0, 0, 0, 0.045, 0.1, 0.045), {});
-    K.glow.add(cx, y + 0.47, cz, CANDLE, 0.8, 1);
+    glow.add(cx, y + 0.47, cz, CANDLE, 0.8, 1);
   }
   b.geo(D.crystal, U.ico(0), pm(x, y + 0.6, z, 0, 0.3, 0, 0.3, 0.7, 0.3), { flat: true });
-  K.glow.add(x, y + 0.5, z, BLUE, 3.5, 0);
+  glow.add(x, y + 0.5, z, BLUE, 3.5, 0);
   K.lights.add(x, y + 0.2, z, CANDLE, 20, 22, true);
+  const group = new THREE.Group();
+  group.name = 'chandelier';
+  for (const mat of [...b.acc.keys()]) group.add(new THREE.Mesh(b.toGeometry(mat), mat));
+  glow.build(group);
+  K.group.add(group);
+  K.chandeliers.push({ group, glow, y: y + 1.6 });
 }
 
 // indigo tower banner on an iron rod held off the wall; (x, z) on the wall face, (nx, nz) into the room, top at y
@@ -276,7 +283,9 @@ function lightShaft(K, c, t, w, h, dir, len, color, alpha) {
       void main(){ vA = along; vE = edge; vW = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0); }`,
     fragmentShader: `uniform vec3 color; uniform float alpha; uniform float time; varying float vA; varying float vE; varying vec3 vW;
       void main(){
-        float a = alpha * pow(1.0 - vA, 1.3) * smoothstep(0.0, 0.08, vA) * pow(sin(3.14159 * vE), 1.5);
+        // (clamped: at the prism's edges the interpolated values overshoot a hair, and pow() of a negative number is
+        // NaN, which rendered as thin black lines along the beams)
+        float a = alpha * pow(max(1.0 - vA, 0.0), 1.3) * smoothstep(0.0, 0.08, vA) * pow(max(sin(3.14159 * clamp(vE, 0.0, 1.0)), 0.0), 1.5);
         a *= 0.8 + 0.2 * sin(time * 0.6 + vW.x * 0.3 + vW.z * 0.2);
         a *= smoothstep(4.0, 16.0, length(vW - cameraPosition));   // (no milky veil with the camera inside a beam)
         gl_FragColor = vec4(color, a);
@@ -313,7 +322,7 @@ async function entranceHall(K, { room: r, doors }) {
     brazier(K, d.x + s * (d.hw + 1.6), y, d.z + 2.2);
     brazier(K, PORTAL_BACK.x + s * 5.6, y, PORTAL_BACK.z - 2.4);
   }
-  chandelier(K, r.x, y + r.h, r.z, 3.2, 6.2);
+  chandelier(K, r.x, y + r.h, r.z, 3.2, 4.4);
 }
 
 // ------------------------------------------------------------------ 2 Hall of Statues
@@ -341,8 +350,8 @@ async function statueHall(K, { room: r, doors, windows }) {
     banner(K, cx + s * 6, y + 13, r.z0, 0, 1, 2.6, 7.2);
     banner(K, cx + s * 7.5, y + 12.5, r.z1, 0, -1, 2.2, 6);
   }
-  chandelier(K, cx, y + r.h, 2, 2.6, 5.6);
-  chandelier(K, cx, y + r.h, 18, 2.6, 5.6);
+  chandelier(K, cx, y + r.h, 2, 2.6, 4.4);
+  chandelier(K, cx, y + r.h, 18, 2.6, 4.4);
   // morning light through the east windows
   for (const w of windows) lightShaft(K, V(w.x - 0.1, (w.y0 + w.y1) / 2, w.z), V(0, 0, 1), w.w * 0.9, w.y1 - w.y0, V(-1, -0.72, 0.18), 17, '#fff0c8', 0.7);
 }
@@ -640,7 +649,7 @@ async function throneRoom(K, { room: r, doors, windows }) {
     if (!windows.some((w) => Math.abs(w.x - x) < 2.6)) sconce(K, x, y + 5.4, r.z1, 0, -1);
   }
   for (const s of [-1, 1]) banner(K, r.x0, y + 13.5, door.z + s * 6.5, 1, 0, 2.4, 7);
-  for (const x of [-10, 3, 16]) chandelier(K, x, y + r.h, cz, 3.4, 7);
+  for (const x of [-10, 3, 16]) chandelier(K, x, y + r.h, cz, 3.4, 6);
 }
 
 function throne(K, x, y, z, rot, sc = 1) {
@@ -698,7 +707,7 @@ export async function buildDecor(ctx, arch) {
   for (const [zone, z] of Object.entries(ctx.zones)) Z[zone] = { b: new GeoBuilder(), bn: new GeoBuilder(), fire: new FireSystem(zone === 'east' ? 1400 : 700), glow: new Glow(), group: z.group };
   const K = {
     Z, M: iselMaterials(), T: townMaterials(), D: decorMaterials(),
-    lights: new LightPool(ctx.scene, 5), col: ctx.colliders, dyn: [], shaftTime: { value: 0 },
+    lights: new LightPool(ctx.scene, 5), col: ctx.colliders, dyn: [], shaftTime: { value: 0 }, chandeliers: [],
   };
   const R = (id) => { useZone(K, ZONE[id]); return arch.rooms.find((q) => q.room.id === id); };
   await entranceHall(K, R('hall'));
@@ -730,6 +739,10 @@ export async function buildDecor(ctx, arch) {
         if (z.glow.uniforms) z.glow.uniforms.time.value = t;
       }
       K.lights.update(t, dt, pos || (camera && camera.position));
+      for (const c of K.chandeliers) {
+        c.group.visible = !camera || camera.position.y < c.y;
+        c.glow.uniforms.time.value = t;
+      }
       for (const f of K.dyn) f(dt, t);
     },
   };

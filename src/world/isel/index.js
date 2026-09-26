@@ -7,10 +7,10 @@ import { Colliders, NavGrid } from '../colliders.js';
 import { MinimapShapes } from '../worldctx.js';
 import { createPortal } from '../portal.js';
 import { IselTerrain } from './terrain.js';
-import { buildArchitecture } from './architecture.js';
+import { buildArchitecture, DOOR_H } from './architecture.js';
 import { buildDecor } from './decor.js';
 import { buildOutside } from './outside.js';
-import { MAP, ROOMS, SPAWN, PORTAL_BACK, MAP_LABELS, ZONE } from './layout.js';
+import { MAP, ROOMS, SPAWN, PORTAL_BACK, MAP_LABELS, ZONE, CORE, deg } from './layout.js';
 import { lerp } from '../../core/utils.js';
 
 const noop = async () => {};
@@ -112,9 +112,26 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
     return 'Tower of Isel';
   };
 
+  // follow camera: it stays under the roof of the hall the hero is in, and the walls around doorways (seen from the
+  // side they face) pull it in instead of hiding the hero who just walked through
+  const camBlockers = [];
+  const doorBlockers = (x, z, nx, nz, hw, y, yTop) => {
+    const tx = -nz, tz = nx, box = (ox, hwb, y0) => ({ x: x + tx * ox, z: z + tz * ox, cos: tx, sin: -tz, hw: hwb, hd: 0.45, y0, y1: yTop, nx, nz });
+    camBlockers.push(box(0, hw + 0.5, y + DOOR_H - 0.15), box(hw + 2.5, 2.2, y - 1), box(-(hw + 2.5), 2.2, y - 1));
+  };
+  for (const { room: r, doors } of arch.rooms) for (const d of doors) doorBlockers(d.x, d.z, -d.dx, -d.dz, d.hw, r.y, r.y + r.h);
+  for (const [a, y] of [[deg(110), 22], [deg(270), 42]]) {
+    const nx = Math.cos(a), nz = Math.sin(a);
+    doorBlockers(CORE.x + nx * CORE.r, CORE.z + nz * CORE.r, nx, nz, 2.75, y, y + 60);
+  }
+  const cameraCeiling = (pos) => {
+    const r = ROOMS.find((q) => q.id === terrain.where(pos.x, pos.z));
+    return r ? r.y + r.h - 0.9 : null;
+  };
+
   const world = {
     id: 'isel', name: 'Tower of Isel', root, terrain, colliders: ctx.colliders, nav, minimap: ctx.minimap,
-    portals: [portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS,
+    portals: [portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS, camBlockers, cameraCeiling,
     stats: `arch ${arch.stats.tris} tris, decor ${decor.stats}, outside ${outside.stats} | ms ${JSON.stringify(ms)}`,
     activate(eng = engine, pos = focus) {
       const w = pos ? terrain.where(pos.x, pos.z) : null;

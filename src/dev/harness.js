@@ -26,6 +26,23 @@ function overlay(src) {
 }
 export function snap() { G.engine.render(); overlay(G.engine.renderer.domElement.toDataURL()); }
 
+// renders one follow-camera frame per setup call into a labelled grid: sheet([[label, () => {...}], ...])
+export function sheet(shots, { cols = 3, w = 400, h = 300, settle = 2 } = {}) {
+  const cv = document.createElement('canvas');
+  cv.width = cols * w; cv.height = Math.ceil(shots.length / cols) * h;
+  const g = cv.getContext('2d');
+  g.font = '18px sans-serif';
+  shots.forEach(([label, setup], i) => {
+    setup();
+    step(settle);
+    G.engine.render();
+    const src = G.engine.renderer.domElement, x = (i % cols) * w, y = Math.floor(i / cols) * h;
+    g.drawImage(src, 0, 0, src.width, src.height, x, y, w, h);
+    g.fillStyle = '#ff0'; g.fillText(label, x + 8, y + 22);
+  });
+  overlay(cv.toDataURL());
+}
+
 // script: [{ keys: ['KeyW'], frames: 30, label, each(i) }], camera beside the hero (side metres to its right)
 export function film(script, { every = 2, cols = 8, w = 150, h = 170, side = 5, camH = 1.0, look = 0.85, zoom = 0.5, view = 'side' } = {}) {
   const p = G.player, cam = G.engine.camera, frames = [];
