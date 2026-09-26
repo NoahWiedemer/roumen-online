@@ -215,6 +215,7 @@ export class Windows {
     if (it.mount) s += `<div class="tt-stat">Riding speed +${Math.round((MOUNTS[it.mount].speed / 6.2 - 1) * 100)}%</div>`;
     if (it.atk) s += `<div class="tt-stat">Attack ${it.atk[0]} ~ ${it.atk[1]}</div>`;
     if (it.def) s += `<div class="tt-stat">Defense +${it.def}</div>`;
+    if (it.guard) s += '<div class="tt-stat">Defense ∞ (you take no damage)</div>';
     for (const k of ['str', 'end', 'dex', 'int', 'spr', 'hp', 'sp']) if (it[k]) s += `<div class="tt-stat">${k === 'hp' ? 'Max HP' : k === 'sp' ? 'Max SP' : STAT_NAMES[k]} +${it[k]}</div>`;
     if (it.lv && it.lv > 1) s += `<div class="${G.player.level >= it.lv ? 'tt-type' : 'tt-req'}">Required level: ${it.lv}</div>`;
     if (it.desc) s += `<div class="tt-desc">${esc(it.desc)}</div>`;

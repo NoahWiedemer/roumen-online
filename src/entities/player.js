@@ -610,6 +610,15 @@ export class Player {
       G.fx.text(this.headPos(), 'Miss', 'miss');
       return;
     }
+    // Raccoon Guard Ring (test ring): the hit lands, but does nothing
+    if (EQUIP_SLOTS.some((s) => ITEMS[this.equipment[s]]?.guard)) {
+      this.inCombatT = 6;
+      this.anim.battleTarget = 1;
+      this.standUp();
+      G.fx.text(this.headPos(), '0', 'hurt');
+      if (!this.target) this.setTarget(from);
+      return;
+    }
     const def = this.stats.def;
     let d = Math.max(1, Math.round((dmg - def * 0.5) * (0.9 + Math.random() * 0.2)));
     this.hp -= d;

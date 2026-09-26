@@ -178,6 +178,9 @@ export const ITEMS = {
   knight_helm: { name: 'Knight\'s Helm', type: 'helm', icon: 'knight_helm', lv: 10, def: 7, price: 3000, desc: 'A visored silver helm.' },
   ring_copper: { name: 'Copper Ring', type: 'ring', icon: 'ring_copper', lv: 1, str: 1, price: 200, desc: 'STR +1' },
   ring_ruby: { name: 'Ruby Ring', type: 'ring', icon: 'ring_ruby', lv: 10, str: 3, hp: 20, price: 5000, desc: 'STR +3, HP +20' },
+  // test ring, only in the Raccoon Stash (cheat): no damage taken, but monsters fight back and hits deal normal damage
+  ring_raccoon: { name: 'Raccoon Guard Ring', type: 'ring', icon: 'ring_raccoon', lv: 1, guard: true, price: 0,
+    desc: 'A test ring from the Raccoon Stash. Endless defense: you take no damage at all, yet monsters still fight you and your blows hit as hard as usual.' },
   necklace_jade: { name: 'Jade Necklace', type: 'necklace', icon: 'necklace_jade', lv: 5, end: 2, hp: 15, price: 900, desc: 'END +2, HP +15' },
   earring_silver: { name: 'Silver Earring', type: 'earring', icon: 'earring_silver', lv: 4, dex: 2, price: 700, desc: 'DEX +2' },
 };

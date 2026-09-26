@@ -2471,6 +2471,16 @@ ITEMS.mount_raccoon = (ctx) => itemFrame(ctx, '#ffb347', () => {
   obj(ctx, (l) => raccoonFace(l), { glow: '#ffd27a', glowR: 4, glowA: 0.5 });
   sparkle(ctx, 80, 22, 4.5, '#ffffff', '#ffd27a');
 });
+// Raccoon Guard Ring (cheat stash): a silver band with a little blue raccoon as the "gem"
+ITEMS.ring_raccoon = (ctx) => itemFrame(ctx, '#5ab4ff', () => {
+  obj(ctx, (l) => {
+    ringBand(l, 50, 66, 29, 20, 6, 0.72, M.steel);
+    l.save(); l.translate(50, 38); l.scale(0.46, 0.46); l.translate(-50, -52);
+    raccoonFace(l, ...BLUE_RACCOON);
+    l.restore();
+  }, { glow: '#5ab4ff', glowR: 5, glowA: 0.6 });
+  sparkle(ctx, 78, 24, 4.5, '#ffffff', '#8ad0ff');
+});
 ITEMS.mount_donkey = (ctx) => itemFrame(ctx, '#7ad0ff', () => {
   obj(ctx, (l) => {
     const E = (x, y, rx, ry, fill, stroke = '#1e1a18', lw = 1, rot = 0) => { l.beginPath(); l.ellipse(x, y, rx, ry, rot, 0, TAU); l.fillStyle = fill; l.fill(); if (stroke) { l.lineWidth = lw; l.strokeStyle = stroke; l.stroke(); } };
