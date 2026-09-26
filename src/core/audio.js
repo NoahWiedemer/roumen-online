@@ -103,6 +103,17 @@ export class Audio {
       case 'hypno': for (let i = 0; i < 5; i++) this.tone(440 * (i % 2 ? 1.26 : 1), 0.5, { type: 'sine', vol: 0.06, delay: i * 0.22, slide: 1.1 }); break;
       case 'powerdown': this.tone(700, 2.2, { type: 'sawtooth', vol: 0.09, slide: 0.06 }); this.tone(350, 2.2, { type: 'square', vol: 0.04, slide: 0.08 }); this.noiseBurst(1.2, { vol: 0.12, freq: 900, slide: 0.3 }); break;
       case 'zap': this.noiseBurst(0.08, { vol: 0.12, freq: 3200, q: 4 }); this.tone(1800 + Math.random() * 900, 0.06, { type: 'square', vol: 0.03 }); break;
+      // Vagel, Goddess of Greed
+      case 'arcane': this.tone(520, 0.35, { type: 'sine', vol: 0.09, slide: 2.2 }); this.tone(780, 0.3, { type: 'triangle', vol: 0.05, slide: 1.8, delay: 0.03 }); this.noiseBurst(0.3, { vol: 0.08, freq: 3200, q: 2, slide: 0.6 }); break;
+      case 'boltHit': this.noiseBurst(0.3, { vol: 0.3, freq: 1500, q: 0.8, slide: 0.35 }); this.tone(330, 0.3, { type: 'triangle', vol: 0.12, slide: 0.45 }); this.tone(1320, 0.18, { type: 'sine', vol: 0.05, slide: 0.7 }); break;
+      case 'wave': this.tone(55, 1.2, { type: 'sine', vol: 0.55, slide: 0.7 }); this.noiseBurst(1.1, { vol: 0.25, freq: 380, type: 'lowpass', slide: 0.6 }); [1318, 1568, 1976].forEach((f, i) => this.tone(f, 0.9, { type: 'sine', vol: 0.035, delay: 0.05 + i * 0.04, slide: 0.9 })); break;
+      case 'judgement': [1046, 1318, 1568].forEach((f, i) => this.tone(f, 1.0, { type: 'sine', vol: 0.05, delay: i * 0.02 })); this.tone(60, 0.7, { type: 'sine', vol: 0.5, slide: 0.55, delay: 0.05 }); this.noiseBurst(0.6, { vol: 0.35, freq: 900, type: 'lowpass', slide: 0.4, delay: 0.05 }); break;
+      case 'chain': for (let i = 0; i < 6; i++) this.noiseBurst(0.07, { vol: 0.14, freq: 4200 - i * 250, q: 6, delay: i * 0.055 }); this.tone(210, 0.5, { type: 'sawtooth', vol: 0.04, slide: 1.6 }); break;
+      case 'laugh': for (let i = 0; i < 5; i++) { this.tone(560 - i * 26, 0.17, { type: 'triangle', vol: 0.07, attack: 0.02, slide: 0.86, delay: i * 0.17 }); this.tone(1120 - i * 52, 0.14, { type: 'sine', vol: 0.025, attack: 0.02, slide: 0.86, delay: i * 0.17 }); this.noiseBurst(0.1, { vol: 0.05, freq: 2400, q: 3, delay: i * 0.17 }); } break;
+      case 'corrupt': this.noiseBurst(0.9, { vol: 0.3, freq: 700, q: 0.7, type: 'lowpass', slide: 0.35 }); this.tone(110, 0.9, { type: 'sawtooth', vol: 0.06, slide: 0.6 }); this.tone(116, 0.9, { type: 'sawtooth', vol: 0.05, slide: 0.62 }); break;
+      case 'divine': [262, 330, 392, 523, 659].forEach((f, i) => this.tone(f, 2.4, { type: 'sine', vol: 0.05, attack: 0.5, delay: i * 0.05 })); this.tone(131, 2.4, { type: 'triangle', vol: 0.05, attack: 0.6 }); break;
+      case 'shatter': for (let i = 0; i < 8; i++) this.tone(2400 + Math.random() * 2600, 0.25 + Math.random() * 0.3, { type: 'sine', vol: 0.04, delay: Math.random() * 0.12 }); this.noiseBurst(0.5, { vol: 0.3, freq: 5200, q: 0.8, slide: 0.4 }); break;
+      case 'coins': for (let i = 0; i < 10; i++) this.tone([1318, 1568, 1760, 2093][i % 4] * (0.97 + Math.random() * 0.06), 0.1, { type: 'square', vol: 0.03, delay: i * 0.045 + Math.random() * 0.02 }); break;
     }
   }
 

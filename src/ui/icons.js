@@ -1767,6 +1767,17 @@ const ITEMS = {
       }, { ow: 4, glow: '#b8ff6a', glowR: 6 });
     });
   },
+  // Vagel's coin: heavy gold with her crowned mark, a wisp of purple corruption curling off it
+  vagel_coin(ctx) {
+    itemFrame(ctx, '#ffc83a', () => {
+      obj(ctx, (l) => {
+        l.beginPath(); l.moveTo(30, 78); l.bezierCurveTo(14, 60, 36, 44, 24, 24); l.bezierCurveTo(44, 40, 30, 58, 44, 72);
+        l.fillStyle = 'rgba(150,60,230,0.55)'; l.fill();
+        coinUp(l, 54, 54, 30, M.gold, 'crown', -0.18);
+      }, { glow: '#b04aff', glowR: 5, glowA: 0.6 });
+      sparkle(ctx, 40, 36, 4, '#ffffff');
+    });
+  },
   king_crown_shard(ctx) {
     itemFrame(ctx, '#ffd040', () => {
       obj(ctx, (l) => {
@@ -2154,6 +2165,25 @@ const ITEMS = {
       sparkle(ctx, 44, 26, 4, '#ffffff');
     });
   },
+  // Vagel's ring: a heavy gold band with little horns and a corrupted amethyst
+  ring_avarice(ctx) {
+    itemFrame(ctx, '#b04aff', () => {
+      obj(ctx, (l) => {
+        const m = M.gold;
+        ringBand(l, 50, 63, 29, 21, 7, 0.72, m);
+        l.lineWidth = 0.9; l.strokeStyle = m.line;
+        for (const s of [-1, 1]) { poly(l, [[50 + s * 12, 44], [50 + s * 24, 26], [50 + s * 17, 46]]); l.fillStyle = lin(l, 50, 26, 50, 46, [m.hi, m.b, m.lo]); l.fill(); l.stroke(); }
+        poly(l, [[38, 44], [62, 44], [58, 52], [42, 52]]); l.fillStyle = lin(l, 38, 44, 62, 52, [m.hi, m.b, m.lo]); l.fill(); l.stroke();
+        const g = M.purple;
+        const top = [[50, 18], [62, 27], [59, 44], [41, 44], [38, 27]];
+        poly(l, top); l.fillStyle = rad(l, 45, 26, 1, 50, 32, 17, [g.hi, g.a, g.b, g.lo]); l.fill(); l.lineWidth = 0.9; l.strokeStyle = g.line; l.stroke();
+        poly(l, [[50, 24], [56, 29], [55, 38], [45, 38], [44, 29]]); l.fillStyle = 'rgba(230,190,255,0.55)'; l.fill();
+        [[38, 29], [62, 29], [41, 44], [59, 44]].forEach(([x, y]) => ball(l, x, y, 2, m));
+        gloss(l, 30, 52, 7, 3, -0.8, 0.8);
+      }, { glow: '#c060ff', glowR: 6, glowA: 0.7 });
+      sparkle(ctx, 45, 24, 4, '#ffffff');
+    });
+  },
   necklace_jade(ctx) {
     itemFrame(ctx, '#40e090', () => {
       obj(ctx, (l) => {
@@ -2412,8 +2442,8 @@ ITEMS.knight_greaves = recoloured('pants_plate', '#9ab4e8', 0.55);
 ITEMS.knight_boots = recoloured('boots_plate', '#9ab4e8', 0.5);
 ITEMS.knight_helm = recoloured('helm_iron', '#9ab4e8', 0.5);
 
-// shop dual blades: two crossed blades of the pair's style
-function twinIcon(frame, style) {
+// shop dual blades: two crossed blades of the pair's style (edges: glow colour of the [right, left] blade's edge)
+function twinIcon(frame, style, edges = null) {
   return (ctx) => itemFrame(ctx, frame, () => {
     const blade = (l, mirror) => {
       l.save();
@@ -2430,19 +2460,20 @@ function twinIcon(frame, style) {
       else pts = [[-3, -2], [-6, -12], [-3.5, -18], [-7, -26], [-4, -32], [-6.5, -40], [-1, -52], [6, -58], [6, -40], [4, -20], [3.5, -2]];
       const bl = style === 'fang' ? ['#5a6470', '#2a3038', '#15191e'] : style === 'saber' ? ['#e8eef6', '#aab4c2', '#5e6878'] : ['#ffffff', '#c6d0de', '#76808e'];
       poly(l, pts); l.fillStyle = lin(l, -6, 0, 6, 0, bl); l.fill(); l.lineWidth = 1; l.strokeStyle = '#1a1e24'; l.stroke();
-      if (style === 'fang') { l.beginPath(); l.moveTo(3.5, -4); l.quadraticCurveTo(5.5, -30, 5.5, -54); l.strokeStyle = '#5affd4'; l.lineWidth = 1.4; l.stroke(); }
+      if (style === 'fang') { l.beginPath(); l.moveTo(3.5, -4); l.quadraticCurveTo(5.5, -30, 5.5, -54); l.strokeStyle = edges ? edges[mirror ? 1 : 0] : '#5affd4'; l.lineWidth = 1.4; l.stroke(); }
       else { l.beginPath(); l.moveTo(0, -4); l.lineTo(style === 'saber' ? 2 : 0, style === 'saber' ? -40 : -38); l.strokeStyle = 'rgba(255,255,255,0.7)'; l.lineWidth = 0.8; l.stroke(); }
       l.restore();
     };
     obj(ctx, (l) => {
       l.save(); l.translate(36, 80); l.rotate(28 * D); blade(l, false); l.restore();
       l.save(); l.translate(64, 80); l.rotate(-28 * D); blade(l, true); l.restore();
-    }, { glow: style === 'fang' ? '#5affd4' : '#ffffff', glowR: 3, glowA: style === 'fang' ? 0.5 : 0.3 });
+    }, { glow: style === 'fang' ? (edges ? edges[0] : '#5affd4') : '#ffffff', glowR: 3, glowA: style === 'fang' ? 0.5 : 0.3 });
   });
 }
 ITEMS.twin_daggers = twinIcon('#c8d4e4', 'dagger');
 ITEMS.twin_sabers = twinIcon('#e8c870', 'saber');
 ITEMS.twin_fangs = twinIcon('#5affd4', 'fang');
+ITEMS.twin_avarice = twinIcon('#ffc83a', 'fang', ['#ffc83a', '#c46aff']);
 
 // raccoon face in the 100x100 icon space; fur = [light, mid, dark], mask / ear colour
 function raccoonFace(l, fur = ['#a89a8c', '#8b7d70', '#6a5e54'], mask = '#26201c', ear = '#302a26') {

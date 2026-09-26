@@ -86,6 +86,30 @@ const SPECS = {
       mat.needsUpdate = true;
     },
   },
+  // Vagel, Goddess of Greed — the last boss of the Tower of Isel (user's Vagel.glb): a hooded sorceress in a long,
+  // gold-trimmed cloak. Bone_027 is the elbow (Bone_037 the forearm, Bone_034/033 the hanging sleeve), Bone_036 /
+  // Bone_041 the wrists; the cloak tails (Bone_013..010 at the back, Bone_005/004 in front) stay unmapped. A goddess:
+  // drawn about twice the hero's height (she has to fill the throne of the Throne Room).
+  vagel: {
+    url: BASE + 'models/vagel.glb', rootBone: 'Bone_000', recenter: true, scale: 2.1, portraitY: 1.5, portraitDist: 0.8,
+    boneMap: {
+      hips: 'Bone_001', spine: 'Bone_009', chest: 'Bone_007', neck: 'Bone_026', head: 'Bone_025',
+      armL: 'Bone_028', elbowL: 'Bone_027', handL: 'Bone_036',
+      armR: 'Bone_031', elbowR: 'Bone_030', handR: 'Bone_041',
+      legL: 'Bone_023', kneeL: 'Bone_022', footL: 'Bone_021',
+      legR: 'Bone_018', kneeR: 'Bone_017', footR: 'Bone_016',
+    },
+    segmentEnd: {
+      armL: 'Bone_027', elbowL: 'Bone_036', handL: 'Bone_049', armR: 'Bone_030', elbowR: 'Bone_041', handR: 'Bone_061',
+      legL: 'Bone_022', kneeL: 'Bone_021', legR: 'Bone_017', kneeR: 'Bone_016',
+    },
+    segmentUp: { hips: 'Bone_009', spine: 'Bone_008', chest: 'Bone_006', neck: 'Bone_025' },
+    material(mat) {
+      // the gold trim keeps its metal map (it shines with the environment reflection set by the boss model)
+      mat.roughness = 0.7;
+      mat.needsUpdate = true;
+    },
+  },
 };
 
 const templates = {};

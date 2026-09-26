@@ -10,6 +10,8 @@ export function step(n, dt = 1 / 30) {
     G.player.update(dt);
     G.monsters.update(dt); G.npcs.update(dt); G.loot.update(dt);
     G.cam.update(dt, G.player.pos, G.input);
+    const cs = G.cutscene;
+    if (cs) { cs.update(dt); cs.applyCamera(dt); }
     G.engine.setShadowFocus(G.player.pos);
     G.world.update(dt, G.time, G.engine.camera, G.player.pos, G.fx);
     G.fx.update(dt, G.engine.camera);

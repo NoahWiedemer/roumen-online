@@ -177,6 +177,12 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 #bossbar span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 1px #000, 0 0 3px #000; }
 #bossbar.enraged .bb-bar { border-color: #ffb0e8; box-shadow: 0 0 12px #ff3ad0, 0 3px 10px #000a, inset 0 2px 4px #000c; animation: bossPulse 1.1s ease-in-out infinite; }
 @keyframes bossPulse { 50% { box-shadow: 0 0 22px #ff3ad0, 0 3px 10px #000a, inset 0 2px 4px #000c; } }
+/* Vagel: violet into gold; her wrath burns gold */
+#bossbar[data-boss="vagel"] .bb-name { color: #fff2c8; text-shadow: 0 2px 0 #3a1060, 0 0 12px #c070ff; }
+#bossbar[data-boss="vagel"] .bb-bar { background: #140a20; border-color: #f2dca0; }
+#bossbar[data-boss="vagel"] .bb-fill { background: linear-gradient(90deg, #4a148a, #a04ae8 45%, #f0b840 85%, #ffe08a); }
+#bossbar[data-boss="vagel"].enraged .bb-bar { border-color: #ffe39a; animation: vagelPulse 1.1s ease-in-out infinite; }
+@keyframes vagelPulse { 0%, 100% { box-shadow: 0 0 12px #ffb830, 0 3px 10px #000a, inset 0 2px 4px #000c; } 50% { box-shadow: 0 0 24px #ffd060, 0 3px 10px #000a, inset 0 2px 4px #000c; } }
 
 /* ------------------------------------------------------------------ floating combat text */
 .fct-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
@@ -323,6 +329,28 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 #travel-fade .tf-text { font: 800 13px Nunito, sans-serif; color: #bfe8e0; min-height: 18px; }
 #travel-fade .tf-bar { width: 300px; height: 8px; border-radius: 4px; background: #0009; border: 1px solid #ffffff40; overflow: hidden; }
 #travel-fade .tf-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7affd6, #ffe07a); transition: width 0.2s; }
+
+/* cutscenes (game/cutscene.js): black bars, dialogue box, skip hint; full-screen flash */
+#cutscene { position: fixed; inset: 0; z-index: 70; pointer-events: none; font-family: Nunito, sans-serif; }
+#cutscene .cs-bar { position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 0.6s ease; }
+#cutscene .cs-bar.top { top: 0; }
+#cutscene .cs-bar.bottom { bottom: 0; }
+#cutscene.on .cs-bar { height: 11vh; }
+#cutscene .cs-box { position: absolute; left: 50%; bottom: 3.2vh; width: min(760px, 86vw); min-height: 64px; box-sizing: border-box; padding: 12px 22px 16px;
+  transform: translate(-50%, 16px); opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+  background: linear-gradient(180deg, rgba(24, 12, 38, 0.94), rgba(8, 4, 16, 0.96)); border: 1px solid rgba(255, 211, 110, 0.55); border-radius: 10px;
+  box-shadow: 0 0 26px rgba(170, 80, 255, 0.35), inset 0 0 18px rgba(255, 200, 90, 0.08); color: #f4ecff; }
+#cutscene .cs-box.show { opacity: 1; transform: translate(-50%, 0); }
+#cutscene .cs-who b { font-weight: 900; font-size: 17px; color: #ffd76a; letter-spacing: 0.5px; text-shadow: 0 0 8px rgba(255, 190, 60, 0.5); }
+#cutscene .cs-who span { margin-left: 10px; font-size: 12.5px; font-style: italic; color: #c9a8ff; }
+#cutscene .cs-text { margin-top: 4px; font-size: 15.5px; font-weight: 700; line-height: 1.5; min-height: 23px; }
+#cutscene .cs-next { position: absolute; right: 14px; bottom: 6px; font-size: 11px; color: #ffd76a; animation: cs-bob 0.9s ease-in-out infinite; }
+#cutscene .cs-skip { position: absolute; right: 18px; top: calc(11vh + 10px); font-size: 12px; font-weight: 800; color: rgba(255, 255, 255, 0.55); opacity: 0; transition: opacity 0.6s; }
+#cutscene.on .cs-skip { opacity: 1; }
+@keyframes cs-bob { 50% { transform: translateY(3px); } }
+body.in-cutscene #hud { opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+#hud { transition: opacity 0.4s; }
+#cs-flash { position: fixed; inset: 0; z-index: 95; pointer-events: none; opacity: 0; background: #fff; }
 
 /* interface hidden hint */
 #ui-toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 40; pointer-events: none; opacity: 0; transition: opacity 0.4s;

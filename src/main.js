@@ -112,12 +112,16 @@ async function init() {
     return w;
   });
   registerBuilder('isel', async (progress) => {
+    await progress(2, 'Something stirs on the throne…');
+    let vagel = false;
+    try { const { preloadVagel, vagelReady } = await import('./entities/bosses/vagel.js'); await preloadVagel(); vagel = vagelReady(); } catch (e) { console.warn('Vagel', e); }
     const { buildIselWorld } = await import('./world/isel/index.js');
+    const { SPAWN_ZONES: ISEL_SPAWNS } = await import('./world/isel/layout.js');
     const w = await buildIselWorld({ engine, progress });
     w.root.visible = false;
     engine.scene.add(w.root);
     w.npcs = new NpcManager([], { parent: w.root, terrain: w.terrain, colliders: w.colliders });
-    w.monsters = new MonsterManager([], w.root);   // (the tower's monsters and its last boss come later)
+    w.monsters = new MonsterManager(vagel ? ISEL_SPAWNS : [], w.root);   // (Vagel on her throne; spawned on the first visit)
     return w;
   });
   G.travel = travel;
@@ -225,13 +229,15 @@ async function startGame(engine, roumen, slot, q) {
     requestAnimationFrame(loop);
     const dt = Math.min(clock.getDelta(), 0.05);
     G.time += dt;
-    handleInput(dt);
+    if (!G.cutscene || !G.cutscene.locked) handleInput(dt);
     player.update(dt);
     updateHouse(dt);
     G.monsters.update(dt);
     G.npcs.update(dt);
     G.loot.update(dt);
     G.cam.update(dt, player.pos, G.input);
+    const cs = G.cutscene;
+    if (cs) { cs.update(dt); cs.applyCamera(dt); }       // (a cutscene takes the camera and the clicks)
     engine.setShadowFocus(player.pos);
     G.world.update(dt, G.time, engine.camera, player.pos, G.fx);
     G.fx.update(dt, engine.camera);

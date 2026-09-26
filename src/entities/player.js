@@ -570,6 +570,14 @@ export class Player {
   // returns true if hit; scale = damage factor for multi-hit swings
   dealDamage(m, sk = null, scale = 1) {
     if (!m || m.dead) return false;
+    // (bosses can be out of reach for a moment: sitting on a throne, talking, blinking away)
+    const immune = m.immune && m.immune();
+    if (immune) {
+      G.fx.text(m.headPos(), immune, 'miss');
+      G.audio.play('miss');
+      m.onAttacked(this, 0);
+      return false;
+    }
     if (this.cheat) {
       // one hit, one knockout
       const dmg = Math.ceil(m.hp);
@@ -606,7 +614,7 @@ export class Player {
     return true;
   }
 
-  // opts.sure: area attacks you failed to dodge always land (no evasion roll)
+  // opts.sure: area attacks you failed to dodge always land (no evasion roll); opts.pierce: armour does not help
   takeDamage(dmg, from, opts = {}) {
     if (this.dead || this.cheat) return;
     const ev = this.stats.evasion;
@@ -624,7 +632,7 @@ export class Player {
       if (!this.target) this.setTarget(from);
       return;
     }
-    const def = this.stats.def;
+    const def = opts.pierce ? 0 : this.stats.def;
     let d = Math.max(1, Math.round((dmg - def * 0.5) * (0.9 + Math.random() * 0.2)));
     this.hp -= d;
     this.inCombatT = 6;
@@ -717,15 +725,18 @@ export class Player {
     const slowed = this.buffs.some((b) => b.id === 'slowed') ? 0.6 : 1;
 
     if (!this.dead && !stunned) {
-      // --- keyboard movement (camera relative)
+      // --- keyboard movement (camera relative; not during a cutscene, the hero only follows its path then)
+      const locked = G.cutscene && G.cutscene.locked;
       let ix = 0, iz = 0;
-      if (input.down('KeyW')) iz += 1;
-      if (input.down('KeyS')) iz -= 1;
-      if (input.down('KeyA')) ix -= 1;
-      if (input.down('KeyD')) ix += 1;
-      if (input.leftHeld && input.buttons.has(2)) iz = 1; // both mouse buttons = run forward
-      if (input.wasPressed('KeyZ')) { this.running = !this.running; G.msg(this.running ? 'Run mode.' : 'Walk mode.'); }
-      if (input.wasPressed('Space')) this.jump();
+      if (!locked) {
+        if (input.down('KeyW')) iz += 1;
+        if (input.down('KeyS')) iz -= 1;
+        if (input.down('KeyA')) ix -= 1;
+        if (input.down('KeyD')) ix += 1;
+        if (input.leftHeld && input.buttons.has(2)) iz = 1; // both mouse buttons = run forward
+        if (input.wasPressed('KeyZ')) { this.running = !this.running; G.msg(this.running ? 'Run mode.' : 'Walk mode.'); }
+        if (input.wasPressed('Space')) this.jump();
+      }
 
       if ((ix || iz) && !busy) {
         this.standUp();
@@ -742,7 +753,7 @@ export class Player {
       }
 
       // --- pending interactions / auto attack
-      if (!moving) {
+      if (!moving && !locked) {
         const t = this.target;
         if (this.pending && this.pending.kind === 'skill' && SKILLS[this.pending.id].kind !== 'melee') {
           this.castSkill(this.pending.id);

@@ -33,7 +33,7 @@ const TELE_FS = `
       float chev = smoothstep(0.55, 1.0, sin((ay * 30.0 - ax * 3.0) - uTime * 9.0));
       a = (0.1 + fill * 0.2 + edge * 0.75 + front * 0.5 + chev * 0.12) * smoothstep(1.0, 0.9, ay);
       col = uColor * (0.8 + a * 0.5); a = clamp(a * 1.25, 0.0, 1.0);
-    } else {                                              // slime puddle: glossy blob with bubbles
+    } else if (uShape < 2.5) {                            // slime puddle: glossy blob with bubbles
       float r = length(vL);
       float wob = 0.9 + 0.06 * sin(atan(vL.y, vL.x) * 5.0 + uTime * 1.3) + 0.04 * sin(atan(vL.y, vL.x) * 9.0 - uTime);
       if (r > wob) discard;
@@ -42,6 +42,15 @@ const TELE_FS = `
       float rim = smoothstep(wob - 0.1, wob, r);
       a = 0.93 - rim * 0.25;
       col = uColor * (0.96 + 0.08 * bub - 0.2 * rim + 0.08 * smoothstep(0.6, 0.0, length(vL - vec2(-0.25, -0.2))));
+    } else {                                              // pool of corruption: dark, swirling, glowing veins
+      float r = length(vL), ang = atan(vL.y, vL.x);
+      float wob = 0.88 + 0.06 * sin(ang * 6.0 + uTime * 1.1) + 0.04 * sin(ang * 11.0 - uTime * 1.7);
+      if (r > wob) discard;
+      float swirl = 0.5 + 0.5 * sin(ang * 3.0 + r * 9.0 - uTime * 2.2);
+      float veins = smoothstep(0.7, 1.0, sin(ang * 7.0 - r * 14.0 + uTime * 1.5 + sin(r * 6.0 + uTime)));
+      float rim = smoothstep(wob - 0.16, wob, r);
+      col = mix(vec3(0.05, 0.0, 0.1), uColor * 0.55, 0.3 + 0.4 * swirl) + uColor * (veins * 1.1 + rim * 1.3);
+      a = 0.8 + rim * 0.2;
     }
     gl_FragColor = vec4(col, a * uAlpha);
     #include <tonemapping_fragment>
@@ -165,20 +174,21 @@ export class Hazards {
   }
   remove(it) { it.dead = true; }
 
-  // a slime blob lobbed from `from` to (x,z): lands after `flight` seconds -> onLand(x, z)
-  blob(from, x, z, flight, onLand) {
-    const m = new THREE.Mesh(this.blobGeo, this.blobMat);
+  // a slime blob lobbed from `from` to (x,z): lands after `flight` seconds -> onLand(x, z) (mat / trail: another look)
+  blob(from, x, z, flight, onLand, { mat = null, trail = null } = {}) {
+    const m = new THREE.Mesh(this.blobGeo, mat || this.blobMat);
     m.castShadow = true;
     this.group.add(m);
     const to = new THREE.Vector3(x, G.terrain.groundAt(x, z), z);
     const h = 7 + from.distanceTo(to) * 0.35;
-    this.items.push({ kind: 'blob', m, from: from.clone(), to, t: 0, dur: flight, h, onLand });
+    this.items.push({ kind: 'blob', m, from: from.clone(), to, t: 0, dur: flight, h, onLand, trail });
   }
-  // sticky milk puddle: slows whoever stands in it
-  puddle(x, z, r, life) {
-    const d = new Decal(this.group, '#f2efe6', 2, 20, 20);
+  // sticky milk puddle: slows whoever stands in it (or: another colour, onInside(dt) while the hero stands in it;
+  // shape 3 = a glowing pool of corruption)
+  puddle(x, z, r, life, { color = '#f2efe6', slow = true, onInside = null, shape = 2 } = {}) {
+    const d = new Decal(this.group, color, shape, 20, 20);
     d.placeCircle(x, z, r);
-    const it = { kind: 'puddle', d, x, z, r, t: 0, dur: life };
+    const it = { kind: 'puddle', d, x, z, r, t: 0, dur: life, slow, onInside };
     this.items.push(it);
     return it;
   }
@@ -244,7 +254,7 @@ export class Hazards {
         it.m.position.y += it.h * 4 * k * (1 - k);
         const s = 1 + 0.18 * Math.sin(it.t * 18);
         it.m.scale.set(s, 2 - s, s);
-        if (Math.random() < dt * 30) G.fx.particles.emit({ x: it.m.position.x, y: it.m.position.y, z: it.m.position.z, vy: -0.5, life: 0.6, size: 0.35, color: MILK, grav: -3, alpha: 0.5 });
+        if (Math.random() < dt * 30) G.fx.particles.emit({ x: it.m.position.x, y: it.m.position.y, z: it.m.position.z, vy: -0.5, life: 0.6, size: 0.35, color: it.trail || MILK, grav: -3, alpha: 0.5 });
         if (k >= 1) { it.dead = true; it.onLand && it.onLand(it.to.x, it.to.z); }
       } else if (it.kind === 'puddle') {
         const fadeIn = Math.min(1, it.t / 0.25), fadeOut = Math.min(1, (it.dur - it.t) / 1.2);
@@ -252,8 +262,11 @@ export class Hazards {
         it.d.mat.uniforms.uTime.value = this.t;
         // sticky: slows the hero while inside
         if (p && !p.dead && Math.hypot(p.pos.x - it.x, p.pos.z - it.z) < it.r * 0.9 && it.t < it.dur - 0.8) {
-          const b = p.buffs.find((x) => x.id === 'slowed');
-          if (b) b.t = Math.max(b.t, 1.2); else p.addBuff('slowed', 1.2, {});
+          if (it.slow) {
+            const b = p.buffs.find((x) => x.id === 'slowed');
+            if (b) b.t = Math.max(b.t, 1.2); else p.addBuff('slowed', 1.2, {});
+          }
+          if (it.onInside) it.onInside(dt);
         }
         if (it.t >= it.dur) it.dead = true;
       } else if (it.kind === 'beam') {

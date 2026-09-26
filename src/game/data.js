@@ -106,6 +106,7 @@ export const ITEMS = {
   rat_whisker: { name: 'Rat Whisker', type: 'material', icon: 'rat_whisker', price: 10, stack: 99, desc: 'A long, wiry whisker. It smells faintly of mist.' },
   king_crown_shard: { name: 'Crown Shard', type: 'material', icon: 'king_crown_shard', price: 600, stack: 99, desc: 'A glittering shard of the Slime King\'s crown.' },
   cumbot_core: { name: 'Jingle Core', type: 'material', icon: 'cumbot_core', price: 1800, stack: 99, desc: 'The humming heart of Cumbot 9000. It still plays a faint tune if you shake it.' },
+  vagel_coin: { name: 'Coin of Avarice', type: 'material', icon: 'vagel_coin', price: 3500, stack: 99, desc: 'A heavy golden coin from Vagel\'s vault. Hold it to your ear and it whispers: "more".' },
 
   sword_wood: { name: 'Training Sword', type: 'weapon', icon: 'sword_wood', lv: 1, atk: [4, 7], price: 20, desc: 'A sturdy practice sword.', look: { blade: '#b98a55', rune: null } },
   sword_bronze: { name: 'Bronze Sword', type: 'weapon', icon: 'sword_bronze', lv: 3, atk: [9, 14], price: 300, desc: 'A reliable bronze blade.', look: { blade: '#d9a066', rune: null } },
@@ -124,6 +125,9 @@ export const ITEMS = {
   robo_blades: { name: 'Robo Blades', type: 'weapon', weaponClass: 'dual', icon: 'robo_blades', lv: 1, atk: [11, 17], dex: 2, price: 2500,
     desc: 'Twin fangs of Robo, King of Beasts. One burns red like the setting sun, one glows blue like the deep sea.',
     look: { model: 'robosword', glowR: '#ff2a3c', glowL: '#2a7bff' } },
+  twin_avarice: { name: 'Fangs of Avarice', type: 'weapon', weaponClass: 'dual', icon: 'twin_avarice', lv: 14, atk: [26, 36], dex: 3, price: 16000,
+    desc: 'Forged from the hoard of Vagel, Goddess of Greed. One fang burns with her gold, the other with her corruption.',
+    look: { model: 'fang', glowR: '#ffc83a', glowL: '#b04aff' } },
 
   // ---- mounts (type 'mount': using the item summons or dismisses the mount; it is never used up)
   mount_raccoon: { name: 'Raccoon Whistle', type: 'mount', mount: 'raccoon', icon: 'mount_raccoon', price: 0,
@@ -178,6 +182,7 @@ export const ITEMS = {
   knight_helm: { name: 'Knight\'s Helm', type: 'helm', icon: 'knight_helm', lv: 10, def: 7, price: 3000, desc: 'A visored silver helm.' },
   ring_copper: { name: 'Copper Ring', type: 'ring', icon: 'ring_copper', lv: 1, str: 1, price: 200, desc: 'STR +1' },
   ring_ruby: { name: 'Ruby Ring', type: 'ring', icon: 'ring_ruby', lv: 10, str: 3, hp: 20, price: 5000, desc: 'STR +3, HP +20' },
+  ring_avarice: { name: 'Ring of Avarice', type: 'ring', icon: 'ring_avarice', lv: 14, str: 3, dex: 3, hp: 40, price: 14000, desc: 'STR +3, DEX +3, HP +40. Vagel\'s own ring. It never stops asking for more.' },
   // test ring, only in the Raccoon Stash (cheat): no damage taken, but monsters fight back and hits deal normal damage
   ring_raccoon: { name: 'Raccoon Guard Ring', type: 'ring', icon: 'ring_raccoon', lv: 1, guard: true, price: 0,
     desc: 'A test ring from the Raccoon Stash. Endless defense: you take no damage at all, yet monsters still fight you and your blows hit as hard as usual.' },
@@ -253,6 +258,14 @@ export const MONSTERS = {
     name: 'Cumbot 9000', baseLv: 15, hp: 5200, atk: [34, 46], def: 18, exp: 1800, copper: [2500, 4200], speed: 3.1, range: 2.2, atkCd: 2.8,
     aggressive: true, aggroRange: 13, leash: 30, respawn: 120, boss: true,        // respawn counted from the knockout
     drops: [['cumbot_core', 1], ['hp_potion_l', 0.7], ['sp_potion_l', 0.5], ['knight_helm', 0.15], ['ring_ruby', 0.2], ['necklace_jade', 0.25]],
+  },
+  // last boss of the Tower of Isel (AI, cutscenes and her Vault: entities/bosses/vagel.js). She waits on the throne;
+  // after a short fight there she takes the hero into her Vault of Avarice for the real one. A caster: range is
+  // the distance she likes to keep
+  vagel: {
+    name: 'Vagel', title: 'Goddess of Greed', baseLv: 18, hp: 7400, atk: [44, 58], def: 20, exp: 4200, copper: [6000, 9000],
+    speed: 3.4, range: 12, atkCd: 2.1, aggressive: true, aggroRange: 0, leash: 80, respawn: 300, boss: true,
+    drops: [['vagel_coin', 1], ['ring_avarice', 0.4], ['twin_avarice', 0.3], ['hp_potion_l', 1], ['sp_potion_l', 0.8], ['knight_plate', 0.12]],
   },
 };
 

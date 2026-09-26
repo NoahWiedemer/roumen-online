@@ -3,7 +3,7 @@
 // and the outer stair are exact; everything else is "void" (far below, never walkable). The visible floors are
 // built as meshes by architecture.js; this object only answers questions.
 import * as THREE from 'three';
-import { MAP, ROOMS, PATHS, CORE, OUTER, OUTER_PROFILE, inRoom, daisHeight } from './layout.js';
+import { MAP, ROOMS, PATHS, CORE, OUTER, OUTER_PROFILE, VAULT, inRoom, daisHeight } from './layout.js';
 
 const VOID_Y = -40;
 
@@ -58,6 +58,7 @@ export class IselTerrain {
       const a = outerAngle(x, z);
       if (a >= OUTER.a0 - 0.01 && a <= OUTER.a1 + 0.01) return { y: outerHeight(a), where: 'outer' };
     }
+    if (Math.hypot(x - VAULT.x, z - VAULT.z) < VAULT.walk) return { y: VAULT.y, where: 'vault' };
     return null;
   }
   heightAt(x, z) { const f = this.floor(x, z); return f ? f.y : VOID_Y; }
@@ -82,6 +83,7 @@ export class IselTerrain {
     const f = this.floor(x, z);
     if (!f) return [22, 20, 30];
     if (f.where === 'outer') return [150, 170, 175];
+    if (f.where === 'vault') return Math.hypot(x - VAULT.x, z - VAULT.z) < 12 ? [196, 150, 70] : [96, 70, 128];
     const room = ROOMS.find((r) => r.id === f.where);
     if (room) return room.style === 'throne' ? [150, 60, 70] : [172, 120, 76];
     return [120, 128, 136];                 // stairs

@@ -10,7 +10,7 @@ import { marbleTex } from '../town/textures.js';
 import { FireSystem } from '../cyclone/structures.js';
 import { glowDotTex } from '../cyclone/textures.js';
 import { iselMaterials } from './architecture.js';
-import { ROOMS, PATHS, CORE, DAIS, PORTAL_BACK, ZONE, inRoom } from './layout.js';
+import { ROOMS, PATHS, CORE, DAIS, SEAT, PORTAL_BACK, ZONE, inRoom } from './layout.js';
 import { bannerTex, stainedTex, runeTex, booksTex, clockTex } from './textures.js';
 import { statueUnit } from './statues.js';
 import { mulberry32 } from '../../core/utils.js';
@@ -621,9 +621,9 @@ async function throneRoom(K, { room: r, doors, windows }) {
   const topY = y + Dd.steps * Dd.rise;
   carpet(K, Dd.x0 + Dd.steps * Dd.run, cz, Dd.x1 - 2.2, cz, topY + 0.02, 4);
   carpet(K, r.x0 + 0.3, cz, Dd.x0 - 0.02, cz, y + 0.03, 5);
-  // the throne, facing down the hall
-  throne(K, Dd.x1 - 3, topY, cz, -Math.PI / 2, 1.4);
-  K.col.addBox(Dd.x1 - 3, cz, 2.0, 2.0, 0);
+  // the throne, facing down the hall (Vagel sits on it: layout.SEAT)
+  throne(K, SEAT.x, topY, SEAT.z, SEAT.rotY, SEAT.scale);
+  K.col.addBox(SEAT.x, SEAT.z, 2.0, 2.0, 0);
   // stained glass behind the throne, light pouring through it
   const gw = 7.2, gy0 = y + 4.6, gy1 = y + 18.6;
   bn.quadN(D.stained, V(r.x1 - 0.05, gy0, cz + gw / 2), V(r.x1 - 0.05, gy0, cz - gw / 2), V(r.x1 - 0.05, gy1, cz - gw / 2), V(r.x1 - 0.05, gy1, cz + gw / 2),
@@ -659,6 +659,7 @@ function throne(K, x, y, z, rot, sc = 1) {
   b.box(M.stone, pm(0, 0.3, -0.1), 3.0, 0.6, 2.6, { uv: 'frame', uvs: 0.3, color: [0.8, 0.86, 0.9] });
   b.box(M.timber, pm(0, 0.9, 0.05), 2.2, 0.6, 1.8, tim);
   b.box(D.velvet, pm(0, 1.28, 0.12), 1.8, 0.18, 1.5, {});
+  b.box(D.velvet, pm(0, 2.02, -0.3), 1.56, 1.3, 0.36, {});          // a plush cushion against the back
   b.box(M.timber, pm(0, 3.4, -0.72), 2.3, 4.8, 0.4, tim);
   b.box(D.velvet, pm(0, 3.1, -0.5), 1.6, 3.4, 0.06, {});
   b.box(M.gold, pm(0, 5.95, -0.72), 2.5, 0.3, 0.5, {});
@@ -729,6 +730,7 @@ export async function buildDecor(ctx, arch) {
   const zones = Object.values(Z);
   return {
     stats: `${Math.round(tris)} tris, ${K.lights.src.length} lamps`,
+    lights: K.lights,          // (the vault adds its own lamps to the pool)
     update(dt, t, camera, pos) {
       townTime.value = t;
       K.shaftTime.value = t;

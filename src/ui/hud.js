@@ -118,7 +118,7 @@ export class HUD {
     const bbar = el('div', 'bb-bar', bb);
     this.bossLag = el('div', 'bb-lag', bbar);
     this.bossFill = el('div', 'bb-fill', bbar);
-    el('i', 'bb-mark', bbar);
+    this.bossMarks = [el('i', 'bb-mark', bbar), el('i', 'bb-mark', bbar)];   // (where the fight changes: boss.barMarks)
     this.bossPct = el('span', '', bbar, '');
 
     // ---------------- minimap
@@ -336,7 +336,13 @@ export class HUD {
     if (boss !== this._boss) {
       this._boss = boss;
       this.bossBar.classList.toggle('hidden', !boss);
-      if (boss) { this.bossName.textContent = `${boss.name}  ·  Lv ${boss.level}`; this._bossKey = ''; }
+      if (boss) {
+        this.bossName.textContent = `${boss.name}${boss.def.title ? ', ' + boss.def.title : ''}  ·  Lv ${boss.level}`;
+        this._bossKey = '';
+        this.bossBar.dataset.boss = boss.type;
+        const marks = boss.barMarks || [0.5];
+        this.bossMarks.forEach((m, i) => { m.style.display = i < marks.length ? '' : 'none'; if (i < marks.length) m.style.left = (marks[i] * 100).toFixed(1) + '%'; });
+      }
     }
     if (!boss) return;
     const pct = Math.max(0, boss.hp / boss.stats.maxHp);

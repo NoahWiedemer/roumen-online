@@ -67,12 +67,32 @@ export function daisHeight(x, z) {
   if (x < D.x0 || z < D.z0 || z > D.z1) return 0;
   return Math.min(D.steps, Math.floor((x - D.x0) / D.run) + 1) * D.rise;
 }
-// where the final boss will wait (on the dais in front of the throne)
+// where Vagel fights (on the dais in front of the throne)
 export const THRONE = { x: room('throne').x1 - 6.5, z: (room('throne').z0 + room('throne').z1) / 2, rotY: -Math.PI / 2 };
+// the throne itself (decor.js builds it at `scale`): the top of its cushion, and where her hips rest on it
+const SEAT_SCALE = 1.15;
+export const SEAT = {
+  x: DAIS.x1 - 3, z: THRONE.z, rotY: -Math.PI / 2, scale: SEAT_SCALE,
+  top: room('throne').y + DAIS.steps * DAIS.rise + 1.37 * SEAT_SCALE, hipX: DAIS.x1 - 3.15,
+};
+
+// Vagel's Vault of Avarice: a round platform of dark marble and gold adrift among the stars. It lies far east of the
+// halls in the same height field, but only her magic leads there (a portal leads back to the throne room)
+export const VAULT = {
+  x: 80, z: 30, r: 28, walk: 26.3, y: 0,
+  hero: { x: 80, z: 41, rotY: Math.PI },          // where the hero lands, facing her
+  boss: { x: 80, z: 22, rotY: 0 },
+  portal: { x: 80, z: 54.2, rotY: Math.PI },      // the way back, on the south rim facing in
+  back: { x: 18, z: -42, rotY: Math.PI / 2 },     // ... into the throne room, facing the throne
+};
+ZONE.vault = 'vault';
+// monsters of the tower: for now only its goddess, waiting on her throne (entities/bosses/vagel.js)
+export const SPAWN_ZONES = [{ id: 'boss_vagel', type: 'vagel', x: SEAT.x, z: SEAT.z, r: 0.5, count: 1, lv: [18, 18], rotY: SEAT.rotY }];
 
 export const MAP_LABELS = [
   [hall.x, hall.z, 'Entrance Hall', '#ffe0a0'], [-3, 8, 'Hall of Statues', '#ffe0a0'], [clock.x, clock.z, 'Clockwork', '#ffe0a0'],
   [-104, -20, 'Outer Stair', '#bfe8ff'], [sanctum.x, sanctum.z, 'Sanctum', '#ffe0a0'], [7, -42, 'Throne Room', '#ffb0c8'],
+  [VAULT.x, VAULT.z, 'Vault of Avarice', '#e8c0ff'],
 ];
 
 export function inRoom(r, x, z, pad = 0) {

@@ -1,6 +1,7 @@
 // Tower of Isel world: the dungeon behind the portal at the end of the Windward Glade. Builds the floors / halls /
 // stairwells (architecture.js), the furnishings (decor.js), the outer stair with the view down onto Cyclone Hill and
-// the Forest of Mist (outside.js), the portal back and the lighting, and returns a world object for world/worlds.js.
+// the Forest of Mist (outside.js), Vagel's Vault of Avarice (vault.js), the portal back and the lighting, and returns
+// a world object for world/worlds.js.
 import * as THREE from 'three';
 import { StaticBatcher } from '../../core/batcher.js';
 import { Colliders, NavGrid } from '../colliders.js';
@@ -10,6 +11,7 @@ import { IselTerrain } from './terrain.js';
 import { buildArchitecture, DOOR_H } from './architecture.js';
 import { buildDecor } from './decor.js';
 import { buildOutside } from './outside.js';
+import { buildVault } from './vault.js';
 import { MAP, ROOMS, SPAWN, PORTAL_BACK, MAP_LABELS, ZONE, CORE, deg } from './layout.js';
 import { lerp } from '../../core/utils.js';
 
@@ -24,6 +26,11 @@ const INSIDE = {
 const OUTSIDE = {
   fog: C('#b2dcdc'), near: 120, far: 1100, hemiSky: C('#e4f4ff'), hemiGround: C('#6a7a58'), hemi: 1.1,
   sun: C('#fff1d6'), sunI: 2.4, sunDir: new THREE.Vector3(-0.55, 0.62, 0.3).normalize(), exposure: 1.04,
+};
+// Vagel's vault: violet sky light, warm gold from above (only reached by teleport: switched, not blended)
+const VAULT_ATM = {
+  fog: C('#1c1233'), near: 48, far: 200, hemiSky: C('#b08cff'), hemiGround: C('#40240f'), hemi: 0.9,
+  sun: C('#ffdcaa'), sunI: 1.7, sunDir: new THREE.Vector3(0.3, 0.9, 0.35).normalize(), exposure: 1.08,
 };
 
 export async function buildIselWorld({ engine, progress = noop } = {}) {
@@ -57,6 +64,12 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
   await progress(70, 'Opening the outer stair…');
   const outside = buildOutside(ctx);
   lap('outside');
+  await progress(76, 'Counting the goddess\'s gold…');
+  zones.vault = { group: new THREE.Group(), batcher: new StaticBatcher(), batcherNoShadow: new StaticBatcher() };
+  zones.vault.group.name = 'isel-vault';
+  root.add(zones.vault.group);
+  const vault = buildVault(ctx, decor);
+  lap('vault');
 
   // the portal back to Cyclone Hill
   const P = PORTAL_BACK;
@@ -76,11 +89,11 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
   const nav = new NavGrid(terrain, ctx.colliders, 1);
   lap('nav');
 
-  // atmosphere: 0 inside .. 1 on the outer stair
+  // atmosphere: 0 inside .. 1 on the outer stair (or the vault's own)
   let k = 0;
   const cur = { fog: new THREE.Color() };
-  const apply = (eng, kk) => {
-    const A = INSIDE, B = OUTSIDE, sc = eng.scene;
+  const apply = (eng, kk, inVault = false) => {
+    const A = inVault ? VAULT_ATM : INSIDE, B = inVault ? VAULT_ATM : OUTSIDE, sc = eng.scene;
     cur.fog.copy(A.fog).lerp(B.fog, kk);
     if (!sc.fog || !sc.fog.isFog) sc.fog = new THREE.Fog(cur.fog, 10, 100);
     sc.fog.color.copy(cur.fog);
@@ -95,13 +108,16 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
   };
   const outsideness = (w) => (w === 'outer' ? 1 : w === 'out' || w === 'in' ? 0.6 : 0);
   // out on the stair the east halls are hidden (they lie outside the tower's silhouette); in the east halls the
-  // view outside is (it is never visible from there)
+  // view outside is (it is never visible from there). The vault shows alone
   let lastWhere = null;
   const showZones = (w) => {
     if (!w) return;
     lastWhere = w;
-    zones.east.group.visible = outsideness(w) === 0;
-    zones.outside.group.visible = ZONE[w] !== 'east';
+    const v = w === 'vault';
+    zones.vault.group.visible = v;
+    zones.core.group.visible = !v;
+    zones.east.group.visible = !v && outsideness(w) === 0;
+    zones.outside.group.visible = !v && ZONE[w] !== 'east';
   };
   const focus = new THREE.Vector3(SPAWN.x, 0, SPAWN.z);
   const areaNameAt = (x, z) => {
@@ -109,6 +125,7 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
     const r = ROOMS.find((q) => q.id === w);
     if (r) return r.name;
     if (w === 'outer' || w === 'out' || w === 'in') return 'Outer Stair';
+    if (w === 'vault') return 'Vault of Avarice';
     return 'Tower of Isel';
   };
 
@@ -131,22 +148,23 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
 
   const world = {
     id: 'isel', name: 'Tower of Isel', root, terrain, colliders: ctx.colliders, nav, minimap: ctx.minimap,
-    portals: [portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS, camBlockers, cameraCeiling,
-    stats: `arch ${arch.stats.tris} tris, decor ${decor.stats}, outside ${outside.stats} | ms ${JSON.stringify(ms)}`,
+    portals: [portal, vault.portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS, camBlockers, cameraCeiling,
+    stats: `arch ${arch.stats.tris} tris, decor ${decor.stats}, outside ${outside.stats}, vault ${vault.stats} | ms ${JSON.stringify(ms)}`,
     activate(eng = engine, pos = focus) {
       const w = pos ? terrain.where(pos.x, pos.z) : null;
       showZones(w || 'hall');
       k = outsideness(lastWhere);
-      apply(eng, k);
+      apply(eng, k, lastWhere === 'vault');
     },
     update(dt, t, camera, pos, fx = null) {
       const w = pos ? terrain.where(pos.x, pos.z) : null;
       showZones(w);
       k += (outsideness(lastWhere) - k) * (1 - Math.exp(-2.5 * dt));
-      apply(engine, k);
-      portal.update(dt, t, fx);
+      apply(engine, k, lastWhere === 'vault');
+      if (zones.east.group.visible) portal.update(dt, t, fx);
       decor.update(dt, t, camera, pos);
       outside.update(dt, t, camera);
+      vault.update(dt, t, camera);
       for (const f of ctx.updaters) f(dt, t);
     },
   };
