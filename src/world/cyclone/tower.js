@@ -81,6 +81,7 @@ export async function buildIselTower(ctx) {
   const P = ISEL_PORTAL;
   const portal = createPortal({ id: 'to_isel', name: 'Tower of Isel', x: P.x, y: T.groundAt(P.x, P.z), z: P.z, rotY: P.rotY });
   portal.dest = 'isel';
+  portal.arriveDist = 3.5;           // (coming back out: stay clear of Cumbot's aggro range)
   ctx.scene.add(portal.group);
   const c = Math.cos(P.rotY), sn = Math.sin(P.rotY);
   for (const sx of [-1, 1]) ctx.colliders.addCircle(P.x + c * sx * 2.35, P.z - sn * sx * 2.35, 0.6);
@@ -101,9 +102,7 @@ export async function buildIselTower(ctx) {
   portal.onUse = () => {
     if (locked()) { G.msg(portal.lockedMsg, 'warn'); G.audio.play('error'); return; }
     G.fx.pillar(portal.pos.clone(), '#ff9ae8', 1.4, 0.9, 7);
-    G.audio.play('teleport');
-    G.ui?.centerMsg('The Tower of Isel', 2.5);
-    G.msg('The portal hums... but the doors of the Tower of Isel are still closed from the inside. (Coming soon)', 'warn');
+    G.travel('isel');
   };
   let wasLocked = null;
   const baseUpdate = portal.update;

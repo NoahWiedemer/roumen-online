@@ -111,6 +111,15 @@ async function init() {
     w.monsters = new MonsterManager(CYCLONE_SPAWNS, w.root);   // spawned on the first visit (worlds.enterWorld)
     return w;
   });
+  registerBuilder('isel', async (progress) => {
+    const { buildIselWorld } = await import('./world/isel/index.js');
+    const w = await buildIselWorld({ engine, progress });
+    w.root.visible = false;
+    engine.scene.add(w.root);
+    w.npcs = new NpcManager([], { parent: w.root, terrain: w.terrain, colliders: w.colliders });
+    w.monsters = new MonsterManager([], w.root);   // (the tower's monsters and its last boss come later)
+    return w;
+  });
   G.travel = travel;
   G.usePortal = (portal) => { if (portal.onUse) portal.onUse(); else if (portal.dest) travel(portal.dest); };
   G.world = roumen;

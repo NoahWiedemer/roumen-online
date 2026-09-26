@@ -441,7 +441,8 @@ export class HUD {
       const h = T.heightAt(wx, wz);
       const hl = 0.9 + Math.max(-0.2, Math.min(0.25, h * 0.006));
       let rgb = col.map((v) => v * shade * hl);
-      if (T.isWater(wx, wz)) { const dp = Math.min(1, Math.max(0, -h / 6)); rgb = mix([110, 200, 235], [40, 110, 200], dp); }
+      if (T.isVoid && T.isVoid(wx, wz)) rgb = col;              // (dungeons: the void keeps its own dark colour)
+      else if (T.isWater(wx, wz)) { const dp = Math.min(1, Math.max(0, -h / 6)); rgb = mix([110, 200, 235], [40, 110, 200], dp); }
       const i = (y * R + x) * 4;
       img.data[i] = rgb[0]; img.data[i + 1] = rgb[1]; img.data[i + 2] = rgb[2]; img.data[i + 3] = 255;
     }

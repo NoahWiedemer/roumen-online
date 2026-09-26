@@ -9,7 +9,7 @@ export const SLOT_COUNT = 6;
 // selectable looks (null = the model's own colours: blue hair, white shirt)
 export const HAIR_COLORS = [null, '#c9303a', '#f0b43c', '#e9edf5', '#2b2833', '#3faa66', '#ff82bd', '#8b5cf2'];
 export const OUTFIT_COLORS = [null, '#c63b3b', '#3a6fd0', '#3d9a5a', '#34323d', '#e3a834', '#8e52cc'];
-export const WORLD_NAMES = { roumen: 'Roumen', cyclone: 'Cyclone Hill' };
+export const WORLD_NAMES = { roumen: 'Roumen', cyclone: 'Cyclone Hill', isel: 'Tower of Isel' };
 
 function read(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
 function write(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch { return false; } }

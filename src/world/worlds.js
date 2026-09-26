@@ -49,11 +49,12 @@ export async function getWorld(id, progress) {
 }
 
 // where to appear in `world` when arriving from world `fromId`: in front of the portal that leads back
+// (portal.arriveDist metres out, 8 by default)
 export function arrivalPoint(world, fromId) {
   const back = (world.portals || []).find((p) => p.dest === fromId);
   if (back) {
-    const r = back.group.rotation.y;
-    return { x: back.pos.x + Math.sin(r) * 8, z: back.pos.z + Math.cos(r) * 8, rotY: r, camYaw: r + Math.PI + 0.55 };
+    const r = back.group.rotation.y, d = back.arriveDist ?? 8;
+    return { x: back.pos.x + Math.sin(r) * d, z: back.pos.z + Math.cos(r) * d, rotY: r, camYaw: r + Math.PI + 0.55 };
   }
   return { ...world.spawn };
 }

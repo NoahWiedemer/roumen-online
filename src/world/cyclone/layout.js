@@ -55,7 +55,8 @@ export const ISEL_TOWER = { x: 162, z: -40, height: 104, sink: 7, rotY: -Math.PI
 // the portal into the tower at the foot of the rock, and the arena where Cumbot 9000 waits in front of it
 export const ISEL_PORTAL = { x: 132.5, z: -40, rotY: -Math.PI / 2 };
 export const BOSS_ARENA = { x: 116, z: -40, r: 18 };
-export const BOSS_HOME = { x: 124, z: -40, rotY: -Math.PI / 2 };
+// (far enough from the portal that a hero coming back out of the tower does not land in Cumbot's aggro range)
+export const BOSS_HOME = { x: 114, z: -40, rotY: -Math.PI / 2 };
 
 // ------------------------------------------------------------------ the chasm between hill and glade
 export const CHASM = {

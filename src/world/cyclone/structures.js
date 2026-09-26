@@ -19,7 +19,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const _up = V(0, 1, 0), _d = new THREE.Vector3(), _q = new THREE.Quaternion(), _c = new THREE.Vector3(), _one = V(1, 1, 1);
 
 // box spanning from a to c (its long axis), cross-section w x d
-function beam(b, mat, a, c, w, opt = {}) {
+export function beam(b, mat, a, c, w, opt = {}) {
   _d.subVectors(c, a);
   const len = _d.length();
   if (len < 1e-4) return;
@@ -143,7 +143,7 @@ function bridge(ctx, b, M, br, rng, fire) {
 }
 
 // ------------------------------------------------------------------ fire: torches, campfires (particles + halos)
-class FireSystem {
+export class FireSystem {
   constructor(max = 900) {
     this.max = max;
     this.emitters = [];
