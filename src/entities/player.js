@@ -18,6 +18,9 @@ import { TOWN } from '../world/layout.js';
 import { saveSlot, tintOf } from '../game/saves.js';
 
 const RUN_SPEED = 6.2, WALK_SPEED = 2.4, GCD = 0.6;
+// ground movement has a little momentum (m/s²): a quick push-off, a short run-out when the keys are released, a
+// firm stop for attacks; the hero faces its motion and only pivots on the spot when (nearly) standing
+const ACCEL = 34, BRAKE = 25, BRAKE_HARD = 80, PIVOT_SPEED = 1.2;
 const DEBUFFS = ['slowed', 'hypnotized', 'stunned'];
 const INV_SIZE = 48; // 2 pages x 24
 
@@ -37,6 +40,7 @@ export class Player {
     this.pos = new THREE.Vector3(TOWN.spawn.x, 0, TOWN.spawn.z);
     this.rotY = -0.52;         // new characters face the fountain & market
     this.velY = 0; this.airborne = false; this.jumpY = 0;
+    this.vel = { x: 0, z: 0 };  // ground velocity (m/s)
     this.level = 1; this.exp = 0; this.statPoints = 1;
     this.alloc = { str: 0, end: 0, dex: 0, int: 0, spr: 0 };
     this.money = STARTING.money;
@@ -292,6 +296,7 @@ export class Player {
   teleport(x, z) {
     this.pos.set(x, G.terrain.groundAt(x, z), z);
     this.path = null;
+    this.vel.x = this.vel.z = 0;
     G.cam.snap(this.pos);
   }
 
@@ -706,9 +711,10 @@ export class Player {
     }
     const stunned = this.stunT > 0;
 
-    let moving = false;
-    let speed = 0;
+    let moving = false;        // steering this frame (keys or a path)
+    let want = null;           // the ground velocity asked for: unit direction + speed
     const busy = this.anim.busy;
+    const slowed = this.buffs.some((b) => b.id === 'slowed') ? 0.6 : 1;
 
     if (!this.dead && !stunned) {
       // --- keyboard movement (camera relative)
@@ -721,8 +727,6 @@ export class Player {
       if (input.wasPressed('KeyZ')) { this.running = !this.running; G.msg(this.running ? 'Run mode.' : 'Walk mode.'); }
       if (input.wasPressed('Space')) this.jump();
 
-      const maxSpeed = this.moveSpeed();
-      const slowed = this.buffs.some((b) => b.id === 'slowed') ? 0.6 : 1;
       if ((ix || iz) && !busy) {
         this.standUp();
         this.path = null;
@@ -733,9 +737,7 @@ export class Player {
         let dx = f.x * iz + rx * ix, dz = f.z * iz + rz * ix;
         const l = Math.hypot(dx, dz); dx /= l; dz /= l;
         // every direction is run facing forwards (S turns the hero around instead of backpedalling)
-        speed = maxSpeed * slowed;
-        this.tryMove(dx * speed * dt, dz * speed * dt);
-        this.faceGoal = Math.atan2(dx, dz);
+        want = { x: dx, z: dz, speed: this.moveSpeed() * slowed };
         moving = true;
       }
 
@@ -784,24 +786,29 @@ export class Player {
         }
       }
 
-      // --- path following
+      // --- path following: steer at the next waypoint, round the corner into the leg after it, ease into the last
       if (!moving && this.path && !busy) {
-        const wp = this.path[0];
-        const dx = wp[0] - this.pos.x, dz = wp[1] - this.pos.z;
-        const d = Math.hypot(dx, dz);
-        const maxSpeedP = this.moveSpeed() * slowed;
-        if (d < 0.25) {
-          this.path.shift();
-          if (!this.path.length) this.path = null;
-        } else {
-          const step = Math.min(d, maxSpeedP * dt);
-          const before = this.pos.clone();
-          this.tryMove((dx / d) * step, (dz / d) * step);
-          const moved = Math.hypot(this.pos.x - before.x, this.pos.z - before.z);
-          if (moved < step * 0.2) { this.stuckT += dt; if (this.stuckT > 0.5) { this.path = null; this.stuckT = 0; } }
-          else this.stuckT = 0;
-          this.faceGoal = Math.atan2(dx, dz);
-          speed = maxSpeedP;
+        const P = this.path;
+        let d = Math.hypot(P[0][0] - this.pos.x, P[0][1] - this.pos.z);
+        while (P.length && d < (P.length > 1 ? 0.6 : 0.12)) {
+          P.shift();
+          if (P.length) d = Math.hypot(P[0][0] - this.pos.x, P[0][1] - this.pos.z);
+        }
+        if (!P.length) this.path = null;
+        else {
+          const wp = P[0];
+          let dx = (wp[0] - this.pos.x) / d, dz = (wp[1] - this.pos.z) / d;
+          if (P[1] && d < 1.8) {
+            const ex = P[1][0] - wp[0], ez = P[1][1] - wp[1], el = Math.hypot(ex, ez);
+            if (el > 1e-3) {
+              const k = (1 - d / 1.8) * 0.6;
+              dx = dx * (1 - k) + (ex / el) * k; dz = dz * (1 - k) + (ez / el) * k;
+              const l = Math.hypot(dx, dz); dx /= l; dz /= l;
+            }
+          }
+          let rest = d;
+          for (let i = 1; i < P.length; i++) rest += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+          want = { x: dx, z: dz, speed: Math.min(this.moveSpeed() * slowed, Math.sqrt(2 * BRAKE * 0.8 * rest) + 0.4) };
           moving = true;
         }
       }
@@ -823,6 +830,32 @@ export class Player {
       }
     }
 
+    // --- ground velocity eases towards the one asked for (reversing brakes first), then moves the hero
+    const V = this.vel;
+    const tvx = want ? want.x * want.speed : 0, tvz = want ? want.z * want.speed : 0;
+    let rate = ACCEL;
+    if (!want) rate = busy || this.autoAttack ? BRAKE_HARD : BRAKE;
+    else if (V.x * tvx + V.z * tvz < 0) rate = BRAKE;
+    if (this.dead || stunned) { V.x = 0; V.z = 0; }
+    else {
+      const ddx = tvx - V.x, ddz = tvz - V.z, dd = Math.hypot(ddx, ddz), st = rate * dt;
+      if (dd <= st) { V.x = tvx; V.z = tvz; } else { V.x += (ddx / dd) * st; V.z += (ddz / dd) * st; }
+    }
+    let speed = Math.hypot(V.x, V.z);
+    if (speed > 1e-3 && dt > 1e-5) {
+      const bx = this.pos.x, bz = this.pos.z;
+      this.tryMove(V.x * dt, V.z * dt);
+      const mx = (this.pos.x - bx) / dt, mz = (this.pos.z - bz) / dt, moved = Math.hypot(mx, mz);
+      // blocked by a wall or the edge of the walkable ground: keep only the motion that really happened
+      if (moved < speed * 0.9) { V.x = mx; V.z = mz; speed = moved; }
+      if (this.path && want) {
+        if (moved < want.speed * 0.2) { this.stuckT += dt; if (this.stuckT > 0.5) { this.path = null; this.stuckT = 0; } }
+        else this.stuckT = 0;
+      }
+    } else speed = 0;
+    // the hero faces where it is going, and turns towards a new direction on the spot only when (nearly) standing
+    if (want) this.faceGoal = speed > PIVOT_SPEED ? Math.atan2(V.x, V.z) : Math.atan2(want.x, want.z);
+
     // facing (+ turn lean from the yaw rate)
     const prevRot = this.rotY;
     if (this.faceGoal !== undefined && !this.dead) this.rotY = dampAngle(this.rotY, this.faceGoal, 16, dt);
@@ -841,9 +874,9 @@ export class Player {
 
     // animation (riding: the mount runs, the rider sits in the saddle and rocks with it)
     const riding = !!this.mount;
-    const target = moving && !riding ? clamp(speed / RUN_SPEED, 0.35, 1) : 0;
-    this.anim.speed = this.anim.speed + (target - this.anim.speed) * (1 - Math.exp(-12 * dt));
-    this.anim.groundSpeed = moving && !riding ? speed : 0;
+    // (the gait follows the real ground speed: it eases in and out with the hero's momentum)
+    this.anim.speed = riding ? 0 : clamp(speed / RUN_SPEED, 0, 1);
+    this.anim.groundSpeed = riding ? 0 : speed;
     this.anim.setAirborne(this.airborne && !riding, this.velY);
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.rotY;
@@ -851,7 +884,7 @@ export class Player {
       const m = this.mount.model;
       m.root.position.copy(this.pos);
       m.root.rotation.y = this.rotY;
-      m.update(dt, moving ? speed : 0);
+      m.update(dt, speed);
       m.root.updateMatrixWorld(true);
       m.seat.getWorldPosition(this._fwd);
       const top = this.rig.legGeo ? this.rig.legGeo.top : 0.85;

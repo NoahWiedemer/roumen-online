@@ -34,6 +34,28 @@ const PARENT = {
   legL: 'hips', kneeL: 'legL', footL: 'kneeL', legR: 'hips', kneeR: 'legR', footR: 'kneeR',
 };
 
+// One rotation has two YXZ Euler triples: (x, y, z) and (PI - x, y + PI, z + PI). The decomposition picks between
+// them by itself (it flips where a limb swings past 90°, e.g. a thigh lifted high in the jog), and interpolating
+// between keys - or blending the walk into the jog - across such a flip twists the limb through nonsense poses.
+// Keys therefore keep the triple that is closest to the previous key (unwrapped by whole turns), starting from
+// the one with the smaller twist (|y| + |z|).
+const TWO_PI = Math.PI * 2;
+const HINGE = new Set(['kneeL', 'kneeR', 'elbowL', 'elbowR']);
+const wrapNear = (v, ref) => { while (v - ref > Math.PI) v -= TWO_PI; while (v - ref < -Math.PI) v += TWO_PI; return v; };
+function steadyEuler(x, y, z, prev) {
+  const a = [x, y, z], b = [Math.PI - x, y + Math.PI, z + Math.PI];
+  if (!prev) {
+    for (const r of [a, b]) for (let k = 0; k < 3; k++) r[k] = wrapNear(r[k], 0);
+    return Math.abs(a[1]) + Math.abs(a[2]) <= Math.abs(b[1]) + Math.abs(b[2]) ? a : b;
+  }
+  let da = 0, db = 0;
+  for (let k = 0; k < 3; k++) {
+    a[k] = wrapNear(a[k], prev[k]); b[k] = wrapNear(b[k], prev[k]);
+    da += Math.abs(a[k] - prev[k]); db += Math.abs(b[k] - prev[k]);
+  }
+  return da <= db ? a : b;
+}
+
 let library = null;
 let loading = null;
 export function mocapReady() { return !!library; }
@@ -98,11 +120,16 @@ function bakeLibrary(gltf) {
         if (!MAP[joint]) continue;
         const p = PARENT[joint];
         if (p) loc.multiplyQuaternions(inv.copy(qW[p]).invert(), qW[joint]); else loc.copy(qW[joint]);
+        if (HINGE.has(joint)) {
+          // knees and elbows only bend: keep the bend about the joint's x axis (the twist part of the rotation);
+          // around a 90° bend the full Euler triple has two large angles cancelling each other, which blending
+          // with other poses turns into a twisted limb
+          const bend = 2 * Math.atan2(loc.x, loc.w);
+          key[joint] = [prev ? wrapNear(bend, prev[joint][0]) : wrapNear(bend, 0), 0, 0];
+          continue;
+        }
         eul.setFromQuaternion(loc, 'YXZ');
-        const r = [eul.x, eul.y, eul.z];
-        // keep Euler angles continuous between samples (no 2*PI flips when interpolating)
-        if (prev) for (let k = 0; k < 3; k++) { while (r[k] - prev[joint][k] > Math.PI) r[k] -= Math.PI * 2; while (r[k] - prev[joint][k] < -Math.PI) r[k] += Math.PI * 2; }
-        key[joint] = r;
+        key[joint] = steadyEuler(eul.x, eul.y, eul.z, prev && prev[joint]);
       }
       const hp = wp(bones[MAP.hips]).sub(hipsRest).multiplyScalar(posScale);
       key.pos = [hp.x, hp.y, hp.z];
@@ -128,7 +155,7 @@ function bakeLibrary(gltf) {
     }
     action.stop();
     mixer.uncacheAction(anim);
-    clips[anim.name] = new Clip('mc_' + anim.name, { duration: anim.duration, loop: /_Loop$/.test(anim.name), keys });
+    clips[anim.name] = new Clip('mc_' + anim.name, { duration: anim.duration, loop: /_Loop$/.test(anim.name), keys, slerp: true });
     CLIPS['mc_' + anim.name] = clips[anim.name];     // playable by name: anim.play('mc_Jump_Start')
     // natural speed in "leg lengths per second" so it scales to any character
     meta[anim.name] = { duration: anim.duration, speedLeg: footSpeed / legLen, contact };
@@ -162,7 +189,7 @@ function derive(name, src, { from = 0, to = src.duration, speed = 1, mirror = fa
     return o;
   });
   if (mirror) keys = mirrorKeys(keys);
-  const clip = new Clip(name, { duration: (to - from) / speed, keys, events, sword });
+  const clip = new Clip(name, { duration: (to - from) / speed, keys, events, sword, slerp: true });
   CLIPS[name] = clip;
   return clip;
 }

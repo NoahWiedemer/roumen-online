@@ -36,7 +36,7 @@ export class Clip {
   // momentum through the keys instead of stopping at each one; keys marked `stop: true` (and the first / last key)
   // are held with zero velocity (impacts, the peak of a wind-up)
   constructor(name, opts) {
-    const { duration, keys, loop = false, events = [], base = null, expression = null, sword = null, curve = null } = opts;
+    const { duration, keys, loop = false, events = [], base = null, expression = null, sword = null, curve = null, slerp = false } = opts;
     this.opts = opts;       // kept so a clip can be re-based for another weapon style (see restyleClip)
     this.name = name;
     this.duration = duration;
@@ -45,6 +45,7 @@ export class Clip {
     this.events = events; // [{t, name}]
     this.expression = expression;
     this.sword = sword; // [tStart, tEnd] window where the weapon trail is on
+    this.slerp = slerp; // dense motion-capture keys: joints rotate between keys on the shortest path (see blendPose)
     if (curve === 'smooth') {
       const K = this.keys;
       K.forEach((k, i) => { k.stop = !!keys[i].stop; });
@@ -81,6 +82,7 @@ export class Clip {
       return out;
     }
     const u = ease[b.e]((t - a.t) / Math.max(1e-5, b.t - a.t));
+    if (this.slerp) { blendPose(a, b, u, out); return out; }
     for (const ch of CHANNELS) {
       const pa = a[ch], pb = b[ch], o = out[ch];
       o[0] = pa[0] + (pb[0] - pa[0]) * u;
@@ -99,12 +101,26 @@ export function emptyPose() {
   for (const ch of CHANNELS) p[ch] = zero();
   return p;
 }
+// Blends two poses. Joint rotations far apart are slerped: lerping Euler angles is only right for similar poses,
+// and turns a limb lifted about 90° (where two Euler angles swing against each other) into a twisted mess when
+// e.g. the jog is blended with the walk or the stand. Of the two Euler triples of the result the one nearest to the
+// plain lerp is written, so code adding offsets to the angles afterwards keeps working.
+const _bqa = new THREE.Quaternion(), _bqb = new THREE.Quaternion(), _beu = new THREE.Euler(0, 0, 0, 'YXZ');
+const _wrapNear = (v, ref) => { while (v - ref > Math.PI) v -= Math.PI * 2; while (v - ref < -Math.PI) v += Math.PI * 2; return v; };
 function blendPose(a, b, w, out) {
   for (const ch of CHANNELS) {
     const pa = a[ch], pb = b[ch], o = out[ch];
-    o[0] = pa[0] + (pb[0] - pa[0]) * w;
-    o[1] = pa[1] + (pb[1] - pa[1]) * w;
-    o[2] = pa[2] + (pb[2] - pa[2]) * w;
+    const l0 = pa[0] + (pb[0] - pa[0]) * w, l1 = pa[1] + (pb[1] - pa[1]) * w, l2 = pa[2] + (pb[2] - pa[2]) * w;
+    const far = Math.abs(pb[0] - pa[0]) + Math.abs(pb[1] - pa[1]) + Math.abs(pb[2] - pa[2]) > 0.35;
+    if (ch === 'pos' || ch === 'root' || w <= 0 || w >= 1 || !far) { o[0] = l0; o[1] = l1; o[2] = l2; continue; }
+    _bqa.setFromEuler(_beu.set(pa[0], pa[1], pa[2], 'YXZ'));
+    _bqb.setFromEuler(_beu.set(pb[0], pb[1], pb[2], 'YXZ'));
+    _beu.setFromQuaternion(_bqa.slerp(_bqb, w), 'YXZ');
+    const x = _beu.x, y = _beu.y, z = _beu.z;
+    const ax = _wrapNear(x, l0), ay = _wrapNear(y, l1), az = _wrapNear(z, l2);
+    const bx = _wrapNear(Math.PI - x, l0), by = _wrapNear(y + Math.PI, l1), bz = _wrapNear(z + Math.PI, l2);
+    if (Math.abs(ax - l0) + Math.abs(ay - l1) + Math.abs(az - l2) <= Math.abs(bx - l0) + Math.abs(by - l1) + Math.abs(bz - l2)) { o[0] = ax; o[1] = ay; o[2] = az; }
+    else { o[0] = bx; o[1] = by; o[2] = bz; }
   }
 }
 
@@ -623,7 +639,8 @@ export class Animator {
     const G = this.rig.legGeo;
     const legW = (G ? G.thigh + G.shin : 0.75) * sc;
     const v = this.groundSpeed ?? s * 6.2;
-    if (v > 0.3) this.gaitSpeed = v;
+    // (a hero pushing off from a stand starts with walking steps; the pace is kept while settling after a stop)
+    if (v > 0.05) this.gaitSpeed = Math.max(0.3, v);
     const gv = this.gaitSpeed;
     // standing: relaxed idle, crossfading into a ready fight stance in combat
     this.mc.idleT += dt;
