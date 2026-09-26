@@ -10,6 +10,7 @@ import { CycloneAtmosphere } from './atmosphere.js';
 import { buildWater } from './water.js';
 import { buildFlora } from './flora.js';
 import { buildStructures } from './structures.js';
+import { buildIselTower } from './tower.js';
 import { MAP, ARRIVAL, SPAWN, MAP_LABELS, areaNameAt } from './layout.js';
 
 const noop = async () => {};
@@ -39,6 +40,10 @@ export async function buildCycloneWorld({ engine, progress = noop } = {}) {
   const structures = buildStructures(ctx);
   mark('structures');
 
+  await progress(48, 'Raising the Tower of Isel…');
+  const isel = await buildIselTower(ctx);
+  mark('tower');
+
   // the portal back to Roumen at the south end of the forest
   const portal = createPortal({ id: 'to_roumen', name: 'Roumen', x: ARRIVAL.x, y: terrain.groundAt(ARRIVAL.x, ARRIVAL.z), z: ARRIVAL.z, rotY: ARRIVAL.rotY });
   portal.dest = 'roumen';
@@ -64,7 +69,7 @@ export async function buildCycloneWorld({ engine, progress = noop } = {}) {
   const focus = new THREE.Vector3(SPAWN.x, terrain.groundAt(SPAWN.x, SPAWN.z), SPAWN.z);
   const world = {
     id: 'cyclone', name: 'Cyclone Hill', root, terrain, colliders: ctx.colliders, nav, minimap: ctx.minimap,
-    portals: [portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS, atmosphere, flora,
+    portals: [portal, isel.portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS, atmosphere, flora,
     stats: `ms ${JSON.stringify(times)} | flora ${JSON.stringify(flora.stats)} | structures ${JSON.stringify(structures.stats)}`,
     // put fog, lights, sky and exposure into the state for the given focus position right away
     activate(eng = engine, pos = focus) {
@@ -78,6 +83,7 @@ export async function buildCycloneWorld({ engine, progress = noop } = {}) {
       structures.update(dt, t, camera.position);
       flora.update(dt, t);
       portal.update(dt, t, fx);
+      isel.portal.update(dt, t, fx);
       for (const f of ctx.updaters) f(dt, t);
     },
   };

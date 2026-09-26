@@ -37,7 +37,13 @@ const DEFS = {
   npc: { title: 'NPC', icon: 'quests', w: 380, x: 'c', y: 150 },
   shop: { title: 'Shop', icon: 'shop', w: 330, x: 90, y: 110 },
   skillmaster: { title: 'Skill Master', icon: 'skills', w: 380, x: 90, y: 110 },
+  stash: { title: 'Raccoon Stash', icon: 'cheat', w: 372, x: 60, y: 90 },
 };
+// Raccoon Stash tabs (cheat): every item of the game, grouped
+const STASH_TABS = [
+  ['All', () => true], ['Weapons', (it) => it.type === 'weapon'], ['Armor', (it) => ['armor', 'helm', 'pants', 'boots', 'gloves'].includes(it.type)],
+  ['Jewels', (it) => ['ring', 'necklace', 'earring'].includes(it.type)], ['Items', (it) => ['consumable', 'mount'].includes(it.type)], ['Loot', (it) => it.type === 'material'],
+];
 
 export class Windows {
   constructor(hud) {
@@ -295,6 +301,38 @@ export class Windows {
       });
     }
     el('div', 'money', body, moneyHtml(p.money));
+    // raccoon cheat: a field that opens the stash of every item
+    if (p.cheat) {
+      const st = el('div', 'slot stash-slot interactive', tabs, `<img src="${menuIcon('cheat', 64)}">`);
+      st._tip = () => '<div class="tt-name" style="color:#8ad0ff">Raccoon Stash</div><div class="tt-desc">Every item of the game. Click to open.</div>';
+      st.onclick = () => this.toggle('stash');
+    }
+  }
+
+  // ---------------------------------------------------------------- raccoon stash (cheat)
+  render_stash(body) {
+    const p = G.player;
+    body.innerHTML = '';
+    if (!p.cheat) { el('div', 'tt-type', body, 'Switch on the raccoon cheat (menu bar) first.'); return; }
+    el('div', 'tt-type', body, 'Click: take one · Shift+click: take a full stack. The items stay when the cheat is switched off.').style.marginBottom = '6px';
+    const tabs = el('div', 'stash-tabs', body);
+    this.stashTab = this.stashTab || 0;
+    STASH_TABS.forEach(([name], i) => {
+      const b = el('button', this.stashTab === i ? 'on' : '', tabs, name);
+      b.onclick = () => { this.stashTab = i; this.render('stash'); };
+    });
+    const grid = el('div', 'stash-grid', body);
+    const filter = STASH_TABS[this.stashTab][1];
+    for (const [id, it] of Object.entries(ITEMS)) {
+      if (!filter(it)) continue;
+      const s = el('div', 'slot', grid, `<img src="${itemIcon(it.icon, 64)}">`);
+      s._tip = () => this.itemTip(id) + '<div class="tt-type">Click: take one · Shift+click: a stack</div>';
+      s.onclick = (e) => {
+        const n = e.shiftKey ? it.stack || 1 : 1;
+        const left = p.addItem(id, n);
+        if (left < n) { G.audio.play('pickup'); G.msg(`Raccoon Stash: ${it.name}${n - left > 1 ? ' x' + (n - left) : ''}.`, 'loot'); p.save(); }
+      };
+    }
   }
   sellSlot(idx) {
     const p = G.player;

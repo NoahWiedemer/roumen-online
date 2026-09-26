@@ -7,6 +7,8 @@ import { G } from '../game/game.js';
 import { clamp, dampAngle, mulberry32 } from '../core/utils.js';
 
 const _v = new THREE.Vector3();
+// bosses bring their own AI class (Monster subclass), registered by type from their module (e.g. bosses/cumbot.js)
+export const BOSS_CLASSES = {};
 
 export class Monster {
   constructor(type, level, zone, rng) {
@@ -175,7 +177,7 @@ export class Monster {
       switch (this.state) {
         case 'idle': {
           // aggro check
-          if (this.def.aggressive && !player.dead && player.level < this.level + 8) {
+          if (this.def.aggressive && !player.dead && !player.cheat && player.level < this.level + 8) {
             const d = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
             if (d < (this.def.aggroRange || 6)) { this.target = player; this.state = 'chase'; G.fx.text(this.headPos(), '!', 'aggro'); if (this.type === 'bee') G.audio.play('buzz'); break; }
           }
@@ -194,7 +196,8 @@ export class Monster {
         }
         case 'chase': {
           const t = this.target;
-          if (!t || t.dead || dHome > this.def.leash) { this.state = 'return'; this.target = null; break; }
+          // (the raccoon cheat: monsters never fight the hero)
+          if (!t || t.dead || t.cheat || dHome > this.def.leash) { this.state = 'return'; this.target = null; break; }
           const dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, d = Math.hypot(dx, dz);
           const reach = this.def.range + this.radius + t.radius;
           if (d > reach) {
@@ -265,7 +268,8 @@ export class MonsterManager {
   spawnOne(zone) {
     const rng = this.rng;
     const lv = zone.lv[0] + Math.floor(rng() * (zone.lv[1] - zone.lv[0] + 1));
-    const m = new Monster(zone.type, lv, zone, rng);
+    const C = BOSS_CLASSES[zone.type] || Monster;
+    const m = new C(zone.type, lv, zone, rng);
     for (let k = 0; k < 20; k++) {
       const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * zone.r * 0.8;
       const x = zone.x + Math.cos(a) * r, z = zone.z + Math.sin(a) * r;
@@ -286,7 +290,7 @@ export class MonsterManager {
       else m.update(dt);
       if (m.removed) {
         this.list.splice(i, 1);
-        this.respawnQueue.push({ zone: m.zone, t: m.respawnT });
+        if (!m.zone.noRespawn) this.respawnQueue.push({ zone: m.zone, t: m.respawnT });   // summoned adds never come back
         m.model.dispose && m.model.dispose();
       }
     }

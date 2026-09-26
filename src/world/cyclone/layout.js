@@ -5,7 +5,8 @@
 //   Centre/north: Cyclone Hill — a tiered hill like a layered cake (T1..T4). Ramps wind up along the tier
 //          walls, two gorges cut through the lower tiers and are crossed by bridges. Palisade fort on top.
 //   East: a misty chasm; a long trestle bridge runs from tier 3 along gorge A across the chasm to the
-//          Windward Glade, a raised forest clearing where the tower will stand later.
+//          Windward Glade, a raised forest clearing. At its east end the huge Tower of Isel rises from its rock;
+//          Cumbot 9000 guards the portal into the tower in the arena in front of it.
 //
 // Angles on the hill are measured around HILL with atan2(z - HILL.z, x - HILL.x): 0 = east, +90° = south,
 // ±180° = west, -90° = north.
@@ -42,9 +43,19 @@ export const GORGES = [
   { id: 'gorgeB', angle: deg(-135), r0: 36, r1: 110, halfWidth: 6.5, floor: -10, water: -9 },    // north-west, into the cliffs
 ];
 
-// ------------------------------------------------------------------ the Windward Glade (raised clearing, tower site)
-export const GLADE = { x: 122, z: -40, r: 31, h: 27 };
-export const TOWER_SITE = { x: 126, z: -40, r: 13 };
+// ------------------------------------------------------------------ the Windward Glade (raised clearing) + Tower of Isel
+// an ellipse stretched east-west (r = north-south radius, rx = east-west radius): from the bridge landing at the
+// chasm to the foot of the tower
+export const GLADE = { x: 133, z: -40, r: 31, rx: 42, h: 27 };
+// distance from the glade centre in "r units" (< GLADE.r inside the clearing)
+export const gladeDist = (x, z) => Math.hypot((x - GLADE.x) * GLADE.r / GLADE.rx, z - GLADE.z);
+// the tower (/models/tower.glb): centred on its spire, sunk into the glade's east rim, gate facing the bridge (west);
+// rockR = footprint of its rock base (collider)
+export const ISEL_TOWER = { x: 162, z: -40, height: 104, sink: 7, rotY: -Math.PI / 2, rockR: 22 };
+// the portal into the tower at the foot of the rock, and the arena where Cumbot 9000 waits in front of it
+export const ISEL_PORTAL = { x: 132.5, z: -40, rotY: -Math.PI / 2 };
+export const BOSS_ARENA = { x: 116, z: -40, r: 18 };
+export const BOSS_HOME = { x: 124, z: -40, rotY: -Math.PI / 2 };
 
 // ------------------------------------------------------------------ the chasm between hill and glade
 export const CHASM = {
@@ -159,17 +170,20 @@ export const SPAWN_ZONES = [
   zoneAt('rat_t3b', 'ratman_frenzy', -150, 29, 5, 3, [11, 13]),
   zoneAt('rat_t3c', 'ratman_frenzy', -60, 29, 4, 2, [12, 13]),
   zoneAt('rat_t3d', 'ratman_frenzy', 30, 29, 4, 2, [11, 12]),
+  // mid boss in front of the Tower of Isel
+  { id: 'boss_cumbot', type: 'cumbot', x: BOSS_HOME.x, z: BOSS_HOME.z, r: 0.5, count: 1, lv: [15, 15], rotY: BOSS_HOME.rotY },
 ];
 
 // labels for the area map window
 export const MAP_LABELS = [
-  [0, 132, 'FOREST OF MIST', '#b8fff0'], [0, -40, 'CYCLONE HILL', '#ffd08a'], [122, -62, 'Windward Glade', '#c8ffb0'],
+  [0, 132, 'FOREST OF MIST', '#b8fff0'], [0, -40, 'CYCLONE HILL', '#ffd08a'], [112, -62, 'Windward Glade', '#c8ffb0'],
+  [158, -40, 'Tower of Isel', '#ffc8f0'],
   [84, 0, 'Chasm', '#9fd8ff'], [0, 172, 'to Roumen', '#9fffc8'],
 ];
 
 // ------------------------------------------------------------------ area names (minimap title / banner)
 export function areaNameAt(x, z) {
-  if (Math.hypot(x - GLADE.x, z - GLADE.z) < GLADE.r + 6) return 'Windward Glade';
+  if (gladeDist(x, z) < GLADE.r + 6) return 'Windward Glade';
   const r = Math.hypot(x - HILL.x, z - HILL.z);
   if (r < TIERS[0].r + 6 || z < 10) return 'Cyclone Hill';
   return 'Forest of Mist';

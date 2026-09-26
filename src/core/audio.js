@@ -90,7 +90,25 @@ export class Audio {
       case 'meow': this.tone(620, 0.35, { type: 'triangle', vol: 0.1, slide: 1.4 }); this.tone(860, 0.25, { type: 'triangle', vol: 0.08, slide: 0.7, delay: 0.18 }); break;
       case 'poof': this.noiseBurst(0.5, { vol: 0.3, freq: 1400, q: 0.6, slide: 0.3 }); this.tone(240, 0.25, { type: 'sine', vol: 0.12, slide: 0.5 }); break;
       case 'glint': [1760, 2637, 3520].forEach((f, i) => this.tone(f, 0.25, { type: 'sine', vol: 0.06, delay: i * 0.05 })); break;
+      // Cumbot 9000
+      case 'hoho': for (let i = 0; i < 3; i++) { this.tone(150 - i * 8, 0.3, { type: 'sawtooth', vol: 0.13, attack: 0.03, slide: 0.75, delay: i * 0.34 }); this.noiseBurst(0.25, { vol: 0.08, freq: 420, q: 2, delay: i * 0.34 }); }
+        this.bells(0.95); break;
+      case 'jingle': this.bells(0); break;
+      case 'thud': this.tone(58, 0.28, { type: 'sine', vol: 0.35, slide: 0.6 }); this.noiseBurst(0.2, { vol: 0.22, freq: 180, type: 'lowpass' }); break;
+      case 'quake': this.tone(42, 1.0, { type: 'sine', vol: 0.7, slide: 0.6 }); this.noiseBurst(0.9, { vol: 0.5, freq: 220, type: 'lowpass', slide: 0.5 }); this.tone(90, 0.5, { type: 'square', vol: 0.05, slide: 0.4 }); break;
+      case 'mortar': this.tone(95, 0.3, { type: 'sine', vol: 0.45, slide: 0.5 }); this.noiseBurst(0.5, { vol: 0.2, freq: 500, q: 0.8, slide: 3 }); this.tone(300, 0.5, { type: 'sine', vol: 0.05, slide: 2.5, delay: 0.05 }); break;
+      case 'splat': this.noiseBurst(0.35, { vol: 0.4, freq: 600, type: 'lowpass', slide: 0.4 }); this.tone(170, 0.25, { type: 'sine', vol: 0.18, slide: 0.35 }); break;
+      case 'charge': this.tone(160, 1.8, { type: 'sawtooth', vol: 0.05, attack: 0.4, slide: 6 }); this.tone(320, 1.8, { type: 'sine', vol: 0.06, attack: 0.4, slide: 6 }); break;
+      case 'beam': this.noiseBurst(1.5, { vol: 0.16, freq: 1600, q: 3, slide: 0.7 }); this.tone(620, 1.5, { type: 'square', vol: 0.035, slide: 0.85 }); this.tone(930, 1.5, { type: 'sine', vol: 0.05, slide: 1.2 }); break;
+      case 'hypno': for (let i = 0; i < 5; i++) this.tone(440 * (i % 2 ? 1.26 : 1), 0.5, { type: 'sine', vol: 0.06, delay: i * 0.22, slide: 1.1 }); break;
+      case 'powerdown': this.tone(700, 2.2, { type: 'sawtooth', vol: 0.09, slide: 0.06 }); this.tone(350, 2.2, { type: 'square', vol: 0.04, slide: 0.08 }); this.noiseBurst(1.2, { vol: 0.12, freq: 900, slide: 0.3 }); break;
+      case 'zap': this.noiseBurst(0.08, { vol: 0.12, freq: 3200, q: 4 }); this.tone(1800 + Math.random() * 900, 0.06, { type: 'square', vol: 0.03 }); break;
     }
+  }
+
+  // sleigh bells
+  bells(delay) {
+    for (let i = 0; i < 9; i++) this.tone([2093, 2637, 3136, 2349][i % 4], 0.22, { type: 'triangle', vol: 0.045, delay: delay + i * 0.07 + Math.random() * 0.03 });
   }
 
   // gentle looping tune: pentatonic melody over a I–vi–IV–V progression

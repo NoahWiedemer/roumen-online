@@ -111,6 +111,16 @@ export class HUD {
     this.tfPort = el('div', 'tf-portrait', tf, '<img alt="">').querySelector('img');
     this.tfBuffs = el('div', 'tf-buffs', tf);
 
+    // ---------------- boss bar (while a boss fights the hero)
+    const bb = el('div', 'hidden', R); bb.id = 'bossbar';
+    this.bossBar = bb;
+    this.bossName = el('div', 'bb-name', bb, '');
+    const bbar = el('div', 'bb-bar', bb);
+    this.bossLag = el('div', 'bb-lag', bbar);
+    this.bossFill = el('div', 'bb-fill', bbar);
+    el('i', 'bb-mark', bbar);
+    this.bossPct = el('span', '', bbar, '');
+
     // ---------------- minimap
     const mm = el('div', '', R); mm.id = 'minimap';
     this.mmTitle = el('div', 'mm-title', mm, 'Roumen');
@@ -176,14 +186,22 @@ export class HUD {
     const MENU = [
       ['help', 'Help (F10)', 'help'], ['character', 'Character (C)', 'character'], ['store', 'Store (X)', 'store'], ['inventory', 'Inventory (I)', 'inventory'],
       ['skills', 'Skills (K)', 'skills'], ['quests', 'Quests (L)', 'quests'], ['community', 'Community (F)', 'community'], ['actions', 'Actions (V)', 'actions'],
-      ['house', 'Mini House (H)', 'house'], ['options', 'Options (Esc)', 'options'],
+      ['house', 'Mini House (H)', 'house'], ['options', 'Options (Esc)', 'options'], ['cheat', 'Raccoon Cheat (on / off)', 'cheat'],
     ];
     for (const [icon, title, win] of MENU) {
       const m = el('div', 'micon', mb, `<img src="${menuIcon(icon, 80)}" alt="">`);
       m.title = title;
-      m.onclick = () => { G.audio.play('click'); if (win === 'house') G.player.toggleHouse ? G.player.toggleHouse() : G.player.toggleSit(); else this.win.toggle(win); };
+      m.onclick = () => {
+        G.audio.play('click');
+        if (win === 'house') G.player.toggleHouse ? G.player.toggleHouse() : G.player.toggleSit();
+        else if (win === 'cheat') G.player.setCheat(!G.player.cheat);
+        else this.win.toggle(win);
+      };
       this.menuIcons[win] = m;
     }
+    const cheatIcon = (on) => { this.menuIcons.cheat.classList.toggle('cheat-on', on); if (!on) this.win.close('stash'); };
+    cheatIcon(!!G.player?.cheat);
+    G.on('cheat', cheatIcon);
 
     // ---------------- system log + center msg
     this.syslog = el('div', '', R); this.syslog.id = 'syslog';
@@ -310,6 +328,24 @@ export class HUD {
         } else { s.cd.style.background = 'none'; s.cdt.textContent = ''; }
       }
     }
+  }
+
+  // ---------------------------------------------------------------- boss bar
+  updateBossBar() {
+    const boss = G.monsters && G.monsters.list.find((m) => m.isBoss && m.engaged && !m.dead);
+    if (boss !== this._boss) {
+      this._boss = boss;
+      this.bossBar.classList.toggle('hidden', !boss);
+      if (boss) { this.bossName.textContent = `${boss.name}  ·  Lv ${boss.level}`; this._bossKey = ''; }
+    }
+    if (!boss) return;
+    const pct = Math.max(0, boss.hp / boss.stats.maxHp);
+    const key = Math.round(pct * 1000);
+    if (key === this._bossKey) return;
+    this._bossKey = key;
+    this.bossFill.style.width = this.bossLag.style.width = (pct * 100).toFixed(1) + '%';
+    this.bossPct.textContent = `${Math.round(boss.hp)} / ${boss.stats.maxHp}  (${(pct * 100).toFixed(1)}%)`;
+    this.bossBar.classList.toggle('enraged', boss.phase === 2);
   }
 
   // ---------------------------------------------------------------- buffs
@@ -521,6 +557,7 @@ export class HUD {
       if (t.isNpc) { this.setBar(this.tfHp, 1, 1); this.setBar(this.tfSp, 1, 1); this.tfHp.text.textContent = ''; this.tfSp.text.textContent = ''; }
       else { this.setBar(this.tfHp, t.hp, t.stats.maxHp); this.setBar(this.tfSp, t.def.boss ? 300 : 20 + t.level * 5, t.def.boss ? 300 : 20 + t.level * 5); }
     }
+    this.updateBossBar();
     this.updateCooldowns();
     this.updateBuffTimers();
     this._mmT = (this._mmT || 0) + dt;

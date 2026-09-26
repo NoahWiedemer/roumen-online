@@ -1,5 +1,5 @@
 // Quest log: availability, progress tracking, turn-in
-import { QUESTS, ITEMS } from './data.js';
+import { QUESTS, ITEMS, MONSTERS } from './data.js';
 import { G } from './game.js';
 
 export class QuestLog {
@@ -36,7 +36,7 @@ export class QuestLog {
   progressText(id) {
     const q = QUESTS[id], a = this.active[id];
     const g = q.goal;
-    if (g.type === 'kill') return `${g.target === 'kingslime' ? 'Slime King' : cap(g.target === 'bee' ? 'Honey Bee' : g.target === 'boar' ? 'Wild Boar' : g.target)} defeated: ${Math.min(a ? a.progress : 0, g.count)} / ${g.count}`;
+    if (g.type === 'kill') return `${MONSTERS[g.target]?.name || cap(g.target)} defeated: ${Math.min(a ? a.progress : 0, g.count)} / ${g.count}`;
     if (g.type === 'collect') return `${ITEMS[g.item].name}: ${Math.min(G.player.countItem(g.item), g.count)} / ${g.count}`;
     if (g.type === 'talk') return `Talk to ${G.npcs.get(g.npc)?.title || ''} ${G.npcs.get(g.npc)?.name || ''}`;
     return '';

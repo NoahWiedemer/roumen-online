@@ -161,6 +161,22 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 #syslog div { font-size: 12.5px; font-weight: 800; color: var(--green); text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 1px #000; transition: opacity 1s; white-space: nowrap; }
 #syslog .warn { color: #ffd15a; } #syslog .exp { color: #7dff6a; } #syslog .level { color: #ffe45a; font-size: 14px; }
 #syslog .stat { color: #9ae8ff; } #syslog .loot { color: #ffffff; } #syslog .quest { color: #ffb86a; } #syslog .skill { color: #c8a8ff; }
+#syslog .boss { color: #ff9ae6; font-size: 13.5px; white-space: normal; text-align: right; }
+
+/* boss bar (under the target frame while a boss fights the hero) */
+#bossbar { position: absolute; left: 50%; top: 106px; transform: translateX(-50%); width: 480px; text-align: center; }
+#bossbar .bb-name { display: inline-block; font: 900 17px 'Lilita One', Nunito, sans-serif; letter-spacing: 1px; color: #ffe8f8; padding: 0 18px 2px;
+  text-shadow: 0 2px 0 #5a0a3a, 0 0 10px #ff3ab0; }
+#bossbar .bb-bar { position: relative; height: 18px; border-radius: 9px; background: #1a0812; border: 2px solid #f4d8ea; overflow: hidden;
+  box-shadow: 0 0 0 1px #0008, 0 3px 10px #000a, inset 0 2px 4px #000c; }
+#bossbar .bb-fill, #bossbar .bb-lag { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; }
+#bossbar .bb-lag { background: #fff8; transition: width 0.7s ease-out 0.2s; }
+#bossbar .bb-fill { background: linear-gradient(90deg, #9a0a4a, #ff3a7a 60%, #ff8ab8); transition: width 0.15s linear; }
+#bossbar .bb-fill::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 45%; background: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.05)); }
+#bossbar .bb-mark { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: #fff; opacity: 0.55; }
+#bossbar span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 1px #000, 0 0 3px #000; }
+#bossbar.enraged .bb-bar { border-color: #ffb0e8; box-shadow: 0 0 12px #ff3ad0, 0 3px 10px #000a, inset 0 2px 4px #000c; animation: bossPulse 1.1s ease-in-out infinite; }
+@keyframes bossPulse { 50% { box-shadow: 0 0 22px #ff3ad0, 0 3px 10px #000a, inset 0 2px 4px #000c; } }
 
 /* ------------------------------------------------------------------ floating combat text */
 .fct-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
@@ -214,6 +230,16 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 .inv-tabs button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--rim-dark); background: radial-gradient(circle at 40% 35%, #4a5a78, #10141e); color: #cfe0ff; font-weight: 900; cursor: pointer; }
 .inv-tabs button.on { border-color: var(--gold); color: var(--gold); }
 .inv-grid { display: grid; grid-template-columns: repeat(6, 42px); gap: 3px; justify-content: center; }
+/* raccoon cheat: glowing menu button, stash field in the inventory, stash window */
+.micon.cheat-on img { filter: drop-shadow(0 0 7px #4ab4ff) drop-shadow(0 0 3px #bfe6ff) drop-shadow(0 2px 2px #0009); animation: cheatBob 1.4s ease-in-out infinite; }
+@keyframes cheatBob { 50% { transform: translateY(-3px); } }
+.inv-tabs .stash-slot { width: 28px; height: 28px; margin-left: 10px; border-color: #4ab4ff; box-shadow: 0 0 8px #4ab4ff, inset 0 0 0 1px #9ad8ff; }
+.inv-tabs .stash-slot img { width: 100%; height: 100%; }
+.stash-tabs { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-bottom: 6px; }
+.stash-tabs button { font: 800 11.5px Nunito, sans-serif; padding: 3px 9px; border-radius: 10px; border: 2px solid var(--rim-dark); background: linear-gradient(#3a4a6a, #141c2e); color: #cfe0ff; cursor: pointer; }
+.stash-tabs button.on { border-color: #4ab4ff; color: #bfe6ff; box-shadow: 0 0 6px #4ab4ff; }
+.stash-grid { display: grid; grid-template-columns: repeat(7, 42px); gap: 3px; justify-content: center; max-height: 330px; overflow-y: auto; overflow-x: hidden; padding: 2px;
+  scrollbar-width: thin; scrollbar-color: #4a5a78 #10141e; }
 .money { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; padding: 4px 8px; background: rgba(0,0,0,0.35); border-radius: 6px; border: 1px solid #ffffff14; }
 .money span { display: flex; align-items: center; gap: 3px; font-weight: 900; font-size: 12px; }
 .money i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid #0008; }

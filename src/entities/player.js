@@ -18,6 +18,7 @@ import { TOWN } from '../world/layout.js';
 import { saveSlot, tintOf } from '../game/saves.js';
 
 const RUN_SPEED = 6.2, WALK_SPEED = 2.4, GCD = 0.6;
+const DEBUFFS = ['slowed', 'hypnotized', 'stunned'];
 const INV_SIZE = 48; // 2 pages x 24
 
 export class Player {
@@ -255,7 +256,7 @@ export class Player {
     this.removeItem(id, 1);
   }
   useStone(kind) {
-    if (this.dead) return;
+    if (this.dead || this.isStunned()) return;
     if (this.stones[kind] <= 0) { G.msg(`You have no ${kind.toUpperCase()} stones left. Visit the Healer in town.`, 'warn'); G.audio.play('error'); return; }
     const key = 'stone:' + kind;
     if (this.cooldowns[key] > 0) return;
@@ -345,8 +346,37 @@ export class Player {
     return this.running ? RUN_SPEED : WALK_SPEED;
   }
 
+  // ---------------------------------------------------------------- raccoon cheat (blue raccoon in the menu bar)
+  // on: invulnerable, monsters ignore you, every hit knocks out, the Raccoon Stash in the inventory hands out any
+  // item. Off: all of that is gone again, only the items taken from the stash stay.
+  get cheat() { return !!this.flags.cheat; }
+  setCheat(on) {
+    this.flags.cheat = !!on;
+    if (on) {
+      for (const m of G.monsters.list) {
+        if (m.isBoss && m.engaged) m.reset(false);
+        else if (m.target === this) { m.target = null; m.state = 'return'; }
+      }
+      this.stunT = 0;
+      if (this.spiral) this.spiral.removeFromParent();
+      this.buffs = this.buffs.filter((b) => !DEBUFFS.includes(b.id));
+      this.recalc();
+      G.fx.pillar(this.pos.clone(), '#5ab4ff', 1.4, 0.8, 7);
+      G.audio.play('buff');
+      G.msg('Raccoon cheat ON: invulnerable, no monster aggro, one-hit knockouts. Take any item from the Raccoon Stash in your inventory.', 'skill');
+    } else {
+      G.audio.play('close');
+      G.msg('Raccoon cheat OFF. The items you took stay in your bag.', 'skill');
+    }
+    G.emit('cheat', !!on);
+    G.emit('buffs');
+    G.emit('inventory');
+    this.save();
+  }
+
   // ---------------------------------------------------------------- buffs
   addBuff(id, dur, data = {}) {
+    if (this.cheat && DEBUFFS.includes(id)) return;
     const ex = this.buffs.find((b) => b.id === id);
     if (ex) { ex.t = dur; ex.dur = dur; ex.data = data; }
     else this.buffs.push({ id, t: dur, dur, data });
@@ -432,6 +462,7 @@ export class Player {
   // use a skillbar entry
   useSlot(entry) {
     if (!entry || this.dead) return;
+    if (this.isStunned()) { G.msg('You cannot act right now!', 'warn'); return; }
     if (entry.type === 'item') { this.useItem(entry.id); return; }
     this.useSkill(entry.id);
   }
@@ -534,6 +565,17 @@ export class Player {
   // returns true if hit; scale = damage factor for multi-hit swings
   dealDamage(m, sk = null, scale = 1) {
     if (!m || m.dead) return false;
+    if (this.cheat) {
+      // one hit, one knockout
+      const dmg = Math.ceil(m.hp);
+      m.takeDamage(dmg, this, true);
+      const hp = m.headPos(); hp.y -= 0.3;
+      G.fx.text(hp, String(dmg), 'crit');
+      const sp = m.pos.clone(); sp.y = m.groundY + m.height * 0.5;
+      G.fx.hitSpark(sp, '#6ac0ff', true);
+      G.audio.play('crit');
+      return true;
+    }
     const st = this.stats;
     const hitChance = clamp(0.88 + (st.aim - m.stats.evasion) * 0.012, 0.55, 0.98);
     if (!sk && Math.random() > hitChance) {
@@ -559,11 +601,12 @@ export class Player {
     return true;
   }
 
-  takeDamage(dmg, from) {
-    if (this.dead) return;
+  // opts.sure: area attacks you failed to dodge always land (no evasion roll)
+  takeDamage(dmg, from, opts = {}) {
+    if (this.dead || this.cheat) return;
     const ev = this.stats.evasion;
     const aim = from.stats.aim;
-    if (Math.random() > clamp(0.9 + (aim - ev) * 0.01, 0.5, 0.97)) {
+    if (!opts.sure && Math.random() > clamp(0.9 + (aim - ev) * 0.01, 0.5, 0.97)) {
       G.fx.text(this.headPos(), 'Miss', 'miss');
       return;
     }
@@ -581,9 +624,26 @@ export class Player {
     G.emit('stats');
   }
 
+  // stunned / hypnotised: no moving, attacking or using items for `dur` seconds (a spiral circles the head)
+  stun(dur, kind = 'stun') {
+    if (this.dead || this.cheat) return;
+    this.stunT = Math.max(this.stunT || 0, dur);
+    this.stopActions();
+    this.standUp();
+    this.dismount();
+    this.anim.play('hit');
+    this.addBuff(kind === 'hypno' ? 'hypnotized' : 'stunned', dur, {});
+    G.fx.text(this.headPos().add(new THREE.Vector3(0, 0.3, 0)), kind === 'hypno' ? 'Hypnotized!' : 'Stunned!', 'ko');
+    if (!this.spiral) this.spiral = makeSpiral();
+    this.spiral.material.color.set(kind === 'hypno' ? '#ff7ae8' : '#ffe45a');
+    this.root.add(this.spiral);
+  }
+  isStunned() { return (this.stunT || 0) > 0; }
+
   die() {
     this.hp = 0;
     this.dead = true;
+    this.stunT = 0;
     this.stopActions();
     this.setTarget(null);
     this.sitting = false; this.anim.sitTarget = 0;
@@ -629,12 +689,19 @@ export class Player {
     if (this.inCombatT <= 0 && !this.autoAttack) this.anim.battleTarget = 0;
     this.updateBuffs(dt);
     this.updateRegen(dt);
+    if (this.stunT > 0) {
+      this.stunT = Math.max(0, this.stunT - dt);
+      this.spiral.position.set(0, this.height + 0.3, 0);
+      this.spiral.material.rotation -= dt * 7;
+      if (this.stunT <= 0) this.spiral.removeFromParent();
+    }
+    const stunned = this.stunT > 0;
 
     let moving = false;
     let speed = 0;
     const busy = this.anim.busy;
 
-    if (!this.dead) {
+    if (!this.dead && !stunned) {
       // --- keyboard movement (camera relative)
       let ix = 0, iz = 0;
       if (input.down('KeyW')) iz += 1;
@@ -753,6 +820,7 @@ export class Player {
     if (this.faceGoal !== undefined && !this.dead) this.rotY = dampAngle(this.rotY, this.faceGoal, 16, dt);
     const yawRate = dt > 1e-5 ? angleDiff(prevRot, this.rotY) / dt : 0;
     this.anim.lean += (clamp(yawRate * 0.1, -0.35, 0.35) - this.anim.lean) * (1 - Math.exp(-8 * dt));
+    if (stunned) this.anim.lean = Math.sin(G.time * 4.5) * 0.22;      // dizzy sway
 
     // vertical: terrain + jump
     const gh = G.terrain.groundAt(this.pos.x, this.pos.z);
@@ -919,4 +987,27 @@ export class Player {
     this._savedQuests = data.quests;
     return true;
   }
+}
+
+// two-armed spiral sprite shown over a stunned / hypnotised head (tinted per kind)
+function makeSpiral() {
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.translate(S / 2, S / 2);
+  g.lineCap = 'round';
+  for (let arm = 0; arm < 2; arm++) {
+    g.beginPath();
+    for (let i = 0; i <= 64; i++) {
+      const t = i / 64, a = t * Math.PI * 4 + arm * Math.PI, r = t * S * 0.44;
+      if (i) g.lineTo(Math.cos(a) * r, Math.sin(a) * r); else g.moveTo(0, 0);
+    }
+    g.strokeStyle = '#ffffff'; g.lineWidth = 8; g.stroke();
+  }
+  const tx = new THREE.CanvasTexture(c);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false }));
+  s.scale.setScalar(0.55);
+  s.renderOrder = 9;
+  return s;
 }

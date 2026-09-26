@@ -42,6 +42,9 @@ export async function preloadMonsterAssets() {
   await preloadImp();
 }
 
+// bosses register their model class from their own module (keeps big boss code out of the common path)
+export function registerMonsterModel(type, ctor) { CTORS[type] = ctor; }
+
 export function createMonsterModel(type, { tint } = {}) {
   const C = CTORS[type];
   if (!C) throw new Error(`Unknown monster type "${type}"`);

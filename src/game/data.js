@@ -105,6 +105,7 @@ export const ITEMS = {
   mushroom_cap: { name: 'Mushroom Cap', type: 'material', icon: 'mushroom_cap', price: 12, stack: 99, desc: 'A spotted cap, still springy.' },
   rat_whisker: { name: 'Rat Whisker', type: 'material', icon: 'rat_whisker', price: 10, stack: 99, desc: 'A long, wiry whisker. It smells faintly of mist.' },
   king_crown_shard: { name: 'Crown Shard', type: 'material', icon: 'king_crown_shard', price: 600, stack: 99, desc: 'A glittering shard of the Slime King\'s crown.' },
+  cumbot_core: { name: 'Jingle Core', type: 'material', icon: 'cumbot_core', price: 1800, stack: 99, desc: 'The humming heart of Cumbot 9000. It still plays a faint tune if you shake it.' },
 
   sword_wood: { name: 'Training Sword', type: 'weapon', icon: 'sword_wood', lv: 1, atk: [4, 7], price: 20, desc: 'A sturdy practice sword.', look: { blade: '#b98a55', rune: null } },
   sword_bronze: { name: 'Bronze Sword', type: 'weapon', icon: 'sword_bronze', lv: 3, atk: [9, 14], price: 300, desc: 'A reliable bronze blade.', look: { blade: '#d9a066', rune: null } },
@@ -236,6 +237,12 @@ export const MONSTERS = {
     name: 'Slime King', baseLv: 9, hp: 950, atk: [26, 36], def: 11, exp: 320, copper: [700, 1200], speed: 2.2, range: 3.2, atkCd: 2.6,
     aggressive: true, aggroRange: 9, leash: 30, respawn: 150, boss: true,
     drops: [['king_crown_shard', 1], ['sword_knight', 0.3], ['ring_ruby', 0.25], ['hp_potion_m', 0.8]],
+  },
+  // mid boss in front of the Tower of Isel (AI + mechanics: entities/bosses/cumbot.js). leash = arena radius
+  cumbot: {
+    name: 'Cumbot 9000', baseLv: 15, hp: 5200, atk: [34, 46], def: 18, exp: 1800, copper: [2500, 4200], speed: 3.1, range: 2.2, atkCd: 2.8,
+    aggressive: true, aggroRange: 13, leash: 30, respawn: 300, boss: true,
+    drops: [['cumbot_core', 1], ['hp_potion_l', 0.7], ['sp_potion_l', 0.5], ['knight_helm', 0.15], ['ring_ruby', 0.2], ['necklace_jade', 0.25]],
   },
 };
 
@@ -376,6 +383,13 @@ export const QUESTS = {
     text: 'A giant crowned slime rules the northern meadows above the town. Defeat the Slime King and bring peace to Roumen!',
     goal: { type: 'kill', target: 'kingslime', count: 1 },
     reward: { exp: 900, copper: 3000, items: [['ring_ruby', 1]] },
+  },
+  // Cyclone Hill: Sir Ratman sends the hero after the machine that hypnotises his people
+  q_cumbot: {
+    name: 'The Jolly Machine', giver: 'sir_ratman', level: 12,
+    text: 'Beyond the sky bridge, in the Windward Glade before the Tower of Isel, stands a jolly-looking machine called Cumbot 9000. Its humming clouds the minds of my people. Shut it down! Beware: it lobs slime, and whoever stands in the path of its pink cannon beam forgets how to move for a moment.',
+    goal: { type: 'kill', target: 'cumbot', count: 1 },
+    reward: { exp: 2400, copper: 6000, items: [['hp_potion_l', 5], ['sp_potion_l', 3]] },
   },
 };
 

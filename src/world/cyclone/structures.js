@@ -12,7 +12,7 @@ import { prepPoly, polyNearest, sampleSpline } from '../terrain.js';
 import { glowDotTex, mistPuffTex } from './textures.js';
 import {
   HILL, TIERS, TIER_WALL, RAMPS, BRIDGES, SUMMIT, PALISADE_GATE, WINDMILLS, COTTAGES, LOOKOUTS, CAMPFIRES,
-  FOREST_PATH, TOWER_SITE, polar,
+  FOREST_PATH, BOSS_ARENA, polar,
 } from './layout.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -648,19 +648,25 @@ export function buildStructures(ctx) {
   crate(b, M, -8.2, T.heightAt(-8.2, 151.2), 151.2, 0.2, 0.7, {});
   sack(b, M, -6.4, T.heightAt(-6.4, 151.6), 151.6, 1.2, 1);
 
-  // ---- Windward Glade: standing stones around the (future) tower site
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + 0.2;
-    if (Math.abs(angleDiff(a, Math.PI)) < 0.3) continue; // leave the western approach from the bridge open
-    const r = TOWER_SITE.r + 4.5;
-    const x = TOWER_SITE.x + Math.cos(a) * r, z = TOWER_SITE.z + Math.sin(a) * r;
+  // ---- Windward Glade: a ring of standing stones marks Cumbot's arena in front of the Tower of Isel,
+  // open towards the bridge (west) and the tower portal (east); two torches flank the western entrance
+  const AR = BOSS_ARENA.r + 4;
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2 + 0.11;
+    if (Math.abs(angleDiff(a, Math.PI)) < 0.36 || Math.abs(angleDiff(a, 0)) < 0.5) continue;
+    const x = BOSS_ARENA.x + Math.cos(a) * AR, z = BOSS_ARENA.z + Math.sin(a) * AR;
     const y = T.heightAt(x, z);
     const h = 3.2 + rng() * 2.2;
     b.geo(M.stone, U.bevel(0.2), pm(x, y + h / 2 - 0.3, z, (rng() - 0.5) * 0.12, -a, (rng() - 0.5) * 0.12, 1.1 + rng() * 0.4, h, 0.8), { uv: 'frame', uvs: 0.9, color: [1.12, 1.1, 1.06] });
     ctx.colliders.addCircle(x, z, 0.8);
     ctx.addNoScatter(x, z, 1.6);
   }
-  ctx.minimap.addCircle(TOWER_SITE.x, TOWER_SITE.z, TOWER_SITE.r, 'rgba(240,240,210,0.35)');
+  for (const s of [-1, 1]) {
+    const a = Math.PI + s * 0.46;
+    const x = BOSS_ARENA.x + Math.cos(a) * AR, z = BOSS_ARENA.z + Math.sin(a) * AR;
+    torch(ctx, b, M, x, T.heightAt(x, z), z, rng, fire);
+  }
+  ctx.minimap.addCircle(BOSS_ARENA.x, BOSS_ARENA.z, BOSS_ARENA.r + 3, 'rgba(255,170,230,0.28)');
 
   const stats = { tris: Math.round(b.triangleCount()), arrows };
   b.flush(ctx.batcher);

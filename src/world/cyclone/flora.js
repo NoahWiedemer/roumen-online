@@ -9,7 +9,7 @@ import { tex } from '../../core/textures.js';
 import {
   leafClumpTex, leafClumpDarkTex, blossomClumpTex, autumnClumpTex, bambooLeafTex, fernTex, herbLeafTex, barkTex, glowDotTex,
 } from './textures.js';
-import { MAP, BAMBOO_GROVES, HEALING_HERB_SPOTS, TOWER_SITE, GLADE, ARRIVAL, SPAWN } from './layout.js';
+import { MAP, BAMBOO_GROVES, HEALING_HERB_SPOTS, BOSS_ARENA, GLADE, ARRIVAL, SPAWN } from './layout.js';
 
 export const floraTime = { value: 0 };
 
@@ -338,7 +338,7 @@ export function buildFlora(ctx) {
   // keep the arrival area clear
   ctx.addNoScatter(ARRIVAL.x, ARRIVAL.z, 7);
   ctx.addNoScatter(SPAWN.x, SPAWN.z, 5);
-  ctx.addNoScatter(TOWER_SITE.x, TOWER_SITE.z, TOWER_SITE.r + 2);
+  ctx.addNoScatter(BOSS_ARENA.x, BOSS_ARENA.z, BOSS_ARENA.r + 2);      // (the tower adds its own footprint)
 
   // ---------------- materials
   const barkMat = new THREE.MeshStandardMaterial({ map: barkTex(), roughness: 0.95, color: 0xd8c8b8 });
@@ -389,9 +389,9 @@ export function buildFlora(ctx) {
   }
   // Windward Glade: a ring of big trees around the clearing + blossom trees
   for (let i = 0; i < 70; i++) {
-    const a = rng() * Math.PI * 2, r = GLADE.r * (0.62 + rng() * 0.38);
-    const x = GLADE.x + Math.cos(a) * r, z = GLADE.z + Math.sin(a) * r;
-    if (x < GLADE.x - GLADE.r + 9 && Math.abs(z - GLADE.z) < 8) continue; // keep the bridge landing open
+    const a = rng() * Math.PI * 2, r = 0.62 + rng() * 0.38;
+    const x = GLADE.x + Math.cos(a) * r * GLADE.rx, z = GLADE.z + Math.sin(a) * r * GLADE.r;
+    if (x < GLADE.x - GLADE.rx + 9 && Math.abs(z - GLADE.z) < 8) continue; // keep the bridge landing open
     if (!S.ok(x, z, { slope: 0.25, path: -1 }) || S.blocked(x, z, 2) || S.near(x, z, 3.6)) continue;
     addTree(rng() < 0.35 ? 'blossom' : ['oakA', 'oakB', 'tall'][(rng() * 3) | 0], x, z, 1 + rng() * 0.35);
   }

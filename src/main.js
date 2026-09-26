@@ -101,6 +101,7 @@ async function init() {
   registerBuilder('cyclone', async (progress) => {
     await progress(2, 'Summoning the locals…');
     try { await preloadNpcModels(['ratman', 'robo', 'ratman_mob']); } catch (e) { console.warn('NPC models', e); }
+    try { const { preloadCumbot } = await import('./entities/bosses/cumbot.js'); await preloadCumbot(); } catch (e) { console.warn('Cumbot 9000', e); }
     const { buildCycloneWorld } = await import('./world/cyclone/index.js');
     const { SPAWN_ZONES: CYCLONE_SPAWNS } = await import('./world/cyclone/layout.js');
     const w = await buildCycloneWorld({ engine, progress });
@@ -111,7 +112,7 @@ async function init() {
     return w;
   });
   G.travel = travel;
-  G.usePortal = (portal) => { if (portal.dest) travel(portal.dest); };
+  G.usePortal = (portal) => { if (portal.onUse) portal.onUse(); else if (portal.dest) travel(portal.dest); };
   G.world = roumen;
   G.terrain = roumen.terrain; G.colliders = roumen.colliders; G.nav = roumen.nav; G.portals = roumen.portals;
 
@@ -380,6 +381,7 @@ function handleInput(dt) {
     if (ent && ent.isLoot) { p.pending = { kind: 'loot', loot: ent }; p.moveTo(ent.pos.x, ent.pos.z); continue; }
     if (ent && ent.isPortal) {
       p.exitHouse && p.exitHouse();
+      if (ent.locked && ent.locked()) { G.msg(ent.lockedMsg, 'warn'); G.audio.play('error'); continue; }
       if (ent.dest) { p.autoAttack = false; p.pending = { kind: 'portal', portal: ent }; p.path = null; continue; }
       const d = Math.hypot(ent.pos.x - p.pos.x, ent.pos.z - p.pos.z);
       if (d > 6) { p.moveTo(ent.pos.x + Math.sin(ent.group.rotation.y) * 3.5, ent.pos.z + Math.cos(ent.group.rotation.y) * 3.5); }

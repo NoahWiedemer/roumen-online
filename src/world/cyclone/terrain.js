@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { makeFbm, smoothstep, lerp, clamp } from '../../core/utils.js';
 import { prepPoly, polyNearest, sampleSpline } from '../terrain.js';
 import {
-  MAP, HILL, TIERS, TIER_H, TIER_WALL, RING_SOUTH, GORGES, GLADE, CHASM, VALLEY, MOUNDS, POOLS, RIVER,
+  MAP, HILL, TIERS, TIER_H, TIER_WALL, RING_SOUTH, GORGES, GLADE, gladeDist, CHASM, VALLEY, MOUNDS, POOLS, RIVER,
   FOREST_PATH, PATH_WIDTH, RAMPS, BRIDGES,
 } from './layout.js';
 import { forestFloorTex, meadowTex, clayTex, swirlRockTex, earthCliffTex, trailTex, mudTex } from './textures.js';
@@ -77,7 +77,7 @@ export class CycloneTerrain {
       h = Math.max(h, mount);
     }
     // Windward Glade: a flat clearing cut into the cliffs, rim at least a few metres higher all around
-    const gr = Math.hypot(x - GLADE.x, z - GLADE.z) * (1 + (fbGlade(x * 0.04, z * 0.04) - 0.5) * 0.12);
+    const gr = gladeDist(x, z) * (1 + (fbGlade(x * 0.04, z * 0.04) - 0.5) * 0.12);
     if (gr < GLADE.r + 22) {
       h = Math.max(h, (GLADE.h + 5 + fbGlade(x * 0.07, z * 0.07) * 6) * smoothstep(GLADE.r + 20, GLADE.r + 5, gr));
       const gm = smoothstep(GLADE.r + 3, GLADE.r - 1, gr);
@@ -200,7 +200,7 @@ export class CycloneTerrain {
     const r = Math.hypot(x - HILL.x, z - HILL.z) + (fbWarp(x * 0.05 + 3, z * 0.05) - 0.5) * 18;
     return Math.max(smoothstep(122, 88, r), smoothstep(62, 78, x) * smoothstep(70, 20, z) * smoothstep(-150, -110, z));
   }
-  gladeWeight(x, z) { return smoothstep(GLADE.r + 2, GLADE.r - 4, Math.hypot(x - GLADE.x, z - GLADE.z)); }
+  gladeWeight(x, z) { return smoothstep(GLADE.r + 2, GLADE.r - 4, gladeDist(x, z)); }
 
   // ---------------------------------------------------------------- splat maps
   buildSplat() {

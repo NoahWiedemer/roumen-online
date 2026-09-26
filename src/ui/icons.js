@@ -1748,6 +1748,25 @@ const ITEMS = {
     });
   },
 
+  // Cumbot 9000's core: a glowing lime orb in a red-and-white candy cage with a little bell
+  cumbot_core(ctx) {
+    itemFrame(ctx, '#9dff4a', () => {
+      obj(ctx, (l) => {
+        circle(l, 50, 54, 30);
+        l.fillStyle = rad(l, 40, 42, 2, 50, 54, 32, ['#f4ffd8', '#b8ff6a', '#4ac018', '#0e5a0a']); l.fill();
+        l.save(); circle(l, 50, 54, 30); l.clip();
+        for (let i = -3; i <= 3; i++) {
+          l.beginPath(); l.moveTo(50 + i * 16 - 30, 90); l.lineTo(50 + i * 16 + 10, 18); l.lineWidth = 6;
+          l.strokeStyle = i % 2 ? 'rgba(230,30,40,0.85)' : 'rgba(255,255,255,0.85)'; l.stroke();
+        }
+        l.restore();
+        circle(l, 50, 54, 30); l.lineWidth = 3; l.strokeStyle = '#1a3a0a'; l.stroke();
+        gloss(l, 40, 42, 12, 7, -0.6, 0.9);
+        ball(l, 50, 20, 8, M.gold);
+        l.beginPath(); l.moveTo(45, 22); l.lineTo(55, 22); l.lineWidth = 1.5; l.strokeStyle = M.gold.line; l.stroke();
+      }, { ow: 4, glow: '#b8ff6a', glowR: 6 });
+    });
+  },
   king_crown_shard(ctx) {
     itemFrame(ctx, '#ffd040', () => {
       obj(ctx, (l) => {
@@ -2425,28 +2444,31 @@ ITEMS.twin_daggers = twinIcon('#c8d4e4', 'dagger');
 ITEMS.twin_sabers = twinIcon('#e8c870', 'saber');
 ITEMS.twin_fangs = twinIcon('#5affd4', 'fang');
 
+// raccoon face in the 100x100 icon space; fur = [light, mid, dark], mask / ear colour
+function raccoonFace(l, fur = ['#a89a8c', '#8b7d70', '#6a5e54'], mask = '#26201c', ear = '#302a26') {
+  const E = (x, y, rx, ry, fill, stroke = '#1e1612', lw = 1) => { l.beginPath(); l.ellipse(x, y, rx, ry, 0, 0, TAU); l.fillStyle = fill; l.fill(); if (stroke) { l.lineWidth = lw; l.strokeStyle = stroke; l.stroke(); } };
+  for (const sx of [-1, 1]) {
+    l.beginPath(); l.moveTo(50 + sx * 14, 36); l.lineTo(50 + sx * 30, 14); l.lineTo(50 + sx * 34, 40); l.closePath();
+    l.fillStyle = fur[1]; l.fill(); l.lineWidth = 1.2; l.strokeStyle = '#1e1612'; l.stroke();
+    l.beginPath(); l.moveTo(50 + sx * 18, 36); l.lineTo(50 + sx * 29, 21); l.lineTo(50 + sx * 31, 38); l.closePath(); l.fillStyle = ear; l.fill();
+  }
+  E(50, 54, 32, 27, lin(l, 0, 28, 0, 82, fur), '#1e1612', 1.4);                               // head
+  E(50, 66, 22, 15, '#eee6da', null);                                                         // cheeks
+  l.beginPath(); l.moveTo(20, 50); l.quadraticCurveTo(35, 40, 50, 50); l.quadraticCurveTo(65, 40, 80, 50);
+  l.quadraticCurveTo(66, 62, 50, 56); l.quadraticCurveTo(34, 62, 20, 50); l.closePath(); l.fillStyle = mask; l.fill();   // mask
+  for (const sx of [-1, 1]) {
+    E(50 + sx * 13, 51, 5, 5.5, '#0e0c0e', null);
+    E(50 + sx * 11.5, 49, 1.8, 2, '#ffffff', null);
+    l.beginPath(); l.ellipse(50 + sx * 14, 40, 7, 2.2, sx * 0.25, 0, TAU); l.fillStyle = '#f4efe6'; l.fill();   // brows
+  }
+  E(50, 64, 5, 3.6, '#1a1416', null);                                                        // nose
+  l.beginPath(); l.moveTo(45, 70); l.quadraticCurveTo(50, 74, 55, 70); l.strokeStyle = '#3a2e28'; l.lineWidth = 1.2; l.stroke();
+}
+const BLUE_RACCOON = [['#9ad4ff', '#3a8ae8', '#1a4aa0'], '#0e1e4a', '#123070'];
+
 // mount summons: a raccoon face on a ribbon (Raccoon Whistle) and a donkey head with a brass bell (Donkey Bell)
 ITEMS.mount_raccoon = (ctx) => itemFrame(ctx, '#ffb347', () => {
-  obj(ctx, (l) => {
-    const E = (x, y, rx, ry, fill, stroke = '#1e1612', lw = 1) => { l.beginPath(); l.ellipse(x, y, rx, ry, 0, 0, TAU); l.fillStyle = fill; l.fill(); if (stroke) { l.lineWidth = lw; l.strokeStyle = stroke; l.stroke(); } };
-    // ears
-    for (const sx of [-1, 1]) {
-      l.beginPath(); l.moveTo(50 + sx * 14, 36); l.lineTo(50 + sx * 30, 14); l.lineTo(50 + sx * 34, 40); l.closePath();
-      l.fillStyle = '#8b7d70'; l.fill(); l.lineWidth = 1.2; l.strokeStyle = '#1e1612'; l.stroke();
-      l.beginPath(); l.moveTo(50 + sx * 18, 36); l.lineTo(50 + sx * 29, 21); l.lineTo(50 + sx * 31, 38); l.closePath(); l.fillStyle = '#302a26'; l.fill();
-    }
-    E(50, 54, 32, 27, lin(l, 0, 28, 0, 82, ['#a89a8c', '#8b7d70', '#6a5e54']), '#1e1612', 1.4);   // head
-    E(50, 66, 22, 15, '#eee6da', null);                                                         // cheeks
-    l.beginPath(); l.moveTo(20, 50); l.quadraticCurveTo(35, 40, 50, 50); l.quadraticCurveTo(65, 40, 80, 50);
-    l.quadraticCurveTo(66, 62, 50, 56); l.quadraticCurveTo(34, 62, 20, 50); l.closePath(); l.fillStyle = '#26201c'; l.fill();   // mask
-    for (const sx of [-1, 1]) {
-      E(50 + sx * 13, 51, 5, 5.5, '#0e0c0e', null);
-      E(50 + sx * 11.5, 49, 1.8, 2, '#ffffff', null);
-      l.beginPath(); l.ellipse(50 + sx * 14, 40, 7, 2.2, sx * 0.25, 0, TAU); l.fillStyle = '#f4efe6'; l.fill();   // brows
-    }
-    E(50, 64, 5, 3.6, '#1a1416', null);                                                        // nose
-    l.beginPath(); l.moveTo(45, 70); l.quadraticCurveTo(50, 74, 55, 70); l.strokeStyle = '#3a2e28'; l.lineWidth = 1.2; l.stroke();
-  }, { glow: '#ffd27a', glowR: 4, glowA: 0.5 });
+  obj(ctx, (l) => raccoonFace(l), { glow: '#ffd27a', glowR: 4, glowA: 0.5 });
   sparkle(ctx, 80, 22, 4.5, '#ffffff', '#ffd27a');
 });
 ITEMS.mount_donkey = (ctx) => itemFrame(ctx, '#7ad0ff', () => {
@@ -2532,6 +2554,17 @@ function orbButton(c, symbol, r = 44) {
 }
 
 const MENU = {
+  // cheat toggle: a blue raccoon on a blue orb
+  cheat(ctx) {
+    menuObj(ctx, (l) => {
+      drawOrb(l, 50, 50, 44, { hi: '#e0f4ff', a: '#7ac4ff', b: '#2a6ad8', lo: '#0c2a6a' });
+      l.save(); l.translate(50, 52); l.scale(0.78, 0.78); l.translate(-50, -52);
+      raccoonFace(l, ...BLUE_RACCOON);
+      l.restore();
+      orbShine(l, 50, 50, 44);
+    });
+    sparkle(ctx, 82, 18, 5, '#ffffff', '#8ad0ff');
+  },
   character(ctx) {
     menuObj(ctx, (l) => {
       // collar / shoulders peeking
@@ -3035,6 +3068,31 @@ const BUFFS = {
         starPath(l, x, y, 5, s, s * 0.46, -Math.PI / 2);
         l.fillStyle = rad(l, x - s * 0.3, y - s * 0.3, 0, x, y, s, ['#ffffff', '#ffe860', '#f0a010']); l.fill();
       }, { ow: 3.6, glow: '#fff0a0', glowR: 4 }));
+    });
+  },
+  // Cumbot 9000: pink hypno spiral (can't act) and sticky slime (slower)
+  hypnotized(ctx) {
+    buffFrame(ctx, ['#ffd0f4', '#d02aa8', '#3a0630'], true, () => {
+      obj(ctx, (l) => {
+        l.save(); l.translate(50, 50); l.lineCap = 'round';
+        for (let arm = 0; arm < 2; arm++) {
+          l.beginPath();
+          for (let i = 0; i <= 60; i++) { const t = i / 60, a = t * Math.PI * 4.2 + arm * Math.PI, r = 3 + t * 34; if (i) l.lineTo(Math.cos(a) * r, Math.sin(a) * r); else l.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+          l.lineWidth = 9; l.strokeStyle = arm ? '#ffffff' : '#ff6ae0'; l.stroke();
+        }
+        l.restore();
+      }, { ow: 3.6, glow: '#ff9af0', glowR: 5 });
+    });
+  },
+  slowed(ctx) {
+    buffFrame(ctx, ['#eaffc8', '#5aa820', '#0e3006'], true, () => {
+      obj(ctx, (l) => {
+        l.beginPath(); l.moveTo(14, 60); l.bezierCurveTo(14, 30, 86, 30, 86, 60); l.lineTo(86, 70);
+        l.quadraticCurveTo(78, 72, 76, 82); l.quadraticCurveTo(72, 90, 68, 82); l.quadraticCurveTo(62, 70, 52, 72);
+        l.quadraticCurveTo(44, 74, 42, 88); l.quadraticCurveTo(38, 96, 34, 88); l.quadraticCurveTo(30, 72, 14, 70); l.closePath();
+        l.fillStyle = rad(l, 40, 40, 2, 50, 56, 44, ['#f0ffd0', '#9dff4a', '#3aa010', '#0e4a06']); l.fill();
+        gloss(l, 36, 44, 14, 6, -0.3, 0.9);
+      }, { ow: 3.6 });
     });
   },
   regen(ctx) {
