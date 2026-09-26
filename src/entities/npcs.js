@@ -42,7 +42,7 @@ const LOOKS = {
 };
 
 // relaxed, slightly hunched stance for the rat-man (arms loose at the sides)
-const P_RAT = fullPose({
+export const P_RAT = fullPose({
   ...P_IDLE,
   hips: [0, 0, 0], spine: [0.1, 0, 0], chest: [0.04, 0, 0], neck: [0.05, 0, 0], head: [-0.08, 0, 0],
   armR: [0.05, 0, -0.16], elbowR: [-0.35, 0, 0], handR: [0, 0, 0],
@@ -50,7 +50,7 @@ const P_RAT = fullPose({
   legL: [-0.03, 0.05, 0.06], kneeL: [0.08, 0, 0], legR: [0.03, -0.05, -0.06], kneeR: [0.08, 0, 0],
 });
 // proud, broad-shouldered stance for the werewolf king (arms held a little away from the body)
-const P_KING = fullPose({
+export const P_KING = fullPose({
   ...P_IDLE,
   hips: [0, 0, 0], spine: [-0.04, 0, 0], chest: [-0.06, 0, 0], neck: [0.04, 0, 0], head: [0.02, 0, 0],
   armR: [0.05, 0, -0.34], elbowR: [-0.3, 0, 0], handR: [0, 0, 0],
@@ -60,6 +60,7 @@ const P_KING = fullPose({
 const MODELS = {
   ratman: { create: (look) => createNpcRig('ratman', look), pose: P_RAT },
   robo: { create: (look) => createNpcRig('robo', look), pose: P_KING },
+  ratprince: { create: (look) => createNpcRig('ratprince', look), pose: P_RAT },
 };
 const POSES = ['bow', 'flex', 'lookout', 'stretch', 'wave'];
 
@@ -102,7 +103,7 @@ export class NPC {
     this.root.rotation.y = this.rotY;
     this.marker = null;
     (env.parent || G.scene).add(this.root);
-    if (!this.wander) (env.colliders || G.colliders).addCircle(spot.x, spot.z, 0.5);
+    if (!this.wander) this.collider = (env.colliders || G.colliders).addCircle(spot.x, spot.z, 0.5);
     // a mount standing next to its keeper (def.pet = mount kind)
     if (def.pet) {
       this.pet = createMount(def.pet);
@@ -234,17 +235,46 @@ export class NPC {
 }
 
 export class NpcManager {
-  // defs: NPC definitions for this world; env: { parent, terrain, colliders }
+  // defs: NPC definitions for this world; env: { parent, terrain, colliders }. NPCs with `requiresFlag` appear once
+  // the hero has that flag (e.g. the rescued prince at his father's side)
   constructor(defs = NPCS.filter((n) => !n.world || n.world === 'roumen'), env = {}) {
     this.list = [];
+    this.waiting = [];
+    this.env = env;
     for (const def of defs) {
-      const pt = def.pos || NPC_POINTS[def.spot];
-      if (!pt) continue;
-      this.list.push(new NPC(def, { x: pt[0], z: pt[1], rotY: def.rot || 0 }, env));
+      if (def.requiresFlag) this.waiting.push(def);
+      else this.add(def);
     }
   }
+  add(def, at = null) {
+    const pt = at || def.pos || NPC_POINTS[def.spot];
+    if (!pt) return null;
+    const n = new NPC(def, { x: pt[0], z: pt[1], rotY: def.rot || 0 }, this.env);
+    this.list.push(n);
+    return n;
+  }
+  remove(id) {
+    const i = this.list.findIndex((n) => n.id === id);
+    if (i < 0) return;
+    const n = this.list[i];
+    n.root.removeFromParent();
+    if (n.marker) n.marker.material.dispose();
+    if (n.collider) (this.env.colliders || G.colliders).remove(n.collider);
+    this.list.splice(i, 1);
+  }
   get(id) { return this.list.find((n) => n.id === id); }
-  update(dt) { for (const n of this.list) n.update(dt); }
+  update(dt) {
+    if (this.waiting.length && G.player) {
+      for (let i = this.waiting.length - 1; i >= 0; i--) {
+        const def = this.waiting[i];
+        if (!G.player.flags[def.requiresFlag]) continue;
+        this.waiting.splice(i, 1);
+        this.add(def);
+        this.refreshMarkers();
+      }
+    }
+    for (const n of this.list) n.update(dt);
+  }
   interact(npc) { G.emit('npcInteract', npc); }
   refreshMarkers() {
     for (const n of this.list) {

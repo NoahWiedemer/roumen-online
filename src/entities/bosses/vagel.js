@@ -14,14 +14,19 @@
 //                                (any blow shatters one); from now on also:
 //              Rain of Fortune   giant coins crash down all over the platform (their shadows show where)
 //              Greedy Dash       she streaks through the hero across the arena, leaving corruption on her path
-//   at 30%     Wrath             the halo of a goddess burns behind her head, her specials come faster and bigger:
+//   at 30%     Wrath             her eyes blaze, a golden halo burns behind her head, her blows hit harder and her
+//                                specials come faster and bigger (her avatars flow back into her):
 //              Seraph Blades     she ascends; blades of light turn around her across the whole vault. Move with them
+// Her hostage, Prince Ratman, watches from his cage the whole time. At her wrath his father, Sir Ratman, steps into
+// the vault and throws the hero the Robo S-Card, whose Beast Blessing lets them keep up with her; when she falls she
+// vanishes (vowing to return), her treasure stays in a chest and the prince goes free (all of it: vagelStory.js).
 // Getting knocked out (or leaving during the fight) puts her back on her throne; the next attempt skips the first
 // fight and goes straight back into the vault. Her fall opens the vault's portal back to the throne room.
 import * as THREE from 'three';
 import { Monster, BOSS_CLASSES } from '../monsters.js';
 import { registerMonsterModel } from '../monsterModels.js';
 import { VagelModel, VagelImageModel, preloadVagel, vagelReady } from './vagelModel.js';
+import { vagelStory, preloadVagelStory, attachVagelStory } from './vagelStory.js';
 import { Hazards } from './hazards.js';
 import { Spells } from './spells.js';
 import { Cutscene, flash } from '../../game/cutscene.js';
@@ -31,13 +36,14 @@ import { THRONE, SEAT, VAULT, ZONE, room } from '../../world/isel/layout.js';
 
 registerMonsterModel('vagel', VagelModel);
 registerMonsterModel('vagel_image', VagelImageModel);
-export { preloadVagel, vagelReady };
+export { preloadVagel, vagelReady, preloadVagelStory, attachVagelStory };
 
 export const VAGEL_FLAG = 'boss:vagel';
 const MET_FLAG = 'boss:vagel:met';          // (after the first meeting she only says a line or two)
 // share of her health at which she takes the hero into her vault; the phase gates inside it
 export const SHIFT_AT = 0.9;
 const GATES = [0.6, 0.3];                   // her avatars, her wrath
+const WRATH_POWER = 1.35;                   // (her blows in her wrath)
 const HALL = room('throne');
 const TRIGGER_X = -6;                       // the meeting starts once the hero is this far up the hall
 const WALK_TO = { x: 17, z: THRONE.z };     // ... and the hero walks on to the foot of the dais
@@ -62,7 +68,6 @@ const LINES = {
   calls: { barrage: 'Kneel before gold!', judgement: 'Judgement of the gods!', grasp: 'Everything you have is mine!', corruption: 'Drown in desire!', coinrain: 'Let it rain gold!', seraph: 'Behold the glory of a goddess!' },
   split: 'Which one of us is real, little thief? Guess wrong and pay!',
   enrage: 'ENOUGH! You dare take from ME?!',
-  death: 'No... my treasure... this is not... over...',
   win: 'Another soul for the pile. Thank you for the donation.',
   flee: 'Leaving so soon? Do come back. And bring more gold.',
 };
@@ -73,7 +78,7 @@ const ROTATION = [
   ['seraph', 'coinrain', 'dash', 'judgement', 'wave', 'grasp', 'corruption', 'barrage'],
 ];
 const SPECIAL_EVERY = [7, 6.2, 5.2];
-const SPECIALS = new Set(['barrage', 'judgement', 'wave', 'corruption', 'grasp', 'coinrain', 'dash', 'seraph', 'split', 'wrath']);
+const SPECIALS = new Set(['barrage', 'judgement', 'wave', 'corruption', 'grasp', 'coinrain', 'dash', 'seraph', 'split']);
 // camera shots of the meeting in the throne room (throne at x 33, she fights at x 29.5, the hero stops at x 17)
 const SHOTS = {
   hall: { pos: [-2, 63.5, -42], look: [33, 57.2, -42], dur: 2.4, drift: [0.7, -0.1, 0] },     // down the hall
@@ -94,8 +99,11 @@ export class VagelBoss extends Monster {
     super(type, level, zone, rng);
     this.isBoss = true;
     this.engaged = false;
-    this.stage = 'dormant';     // dormant (on the throne) | intro | throne (first fight) | shift | vault | dead
+    // dormant (on the throne) | intro | throne (first fight) | shift | vault | wrath (its scene) | defeat (her fall's
+    // scene) | dead
+    this.stage = 'dormant';
     this.phase = 1;             // 2 = wrath (the HUD shows the boss bar enraged)
+    this.power = 1;             // her blows (stronger in her wrath)
     this.vphase = 0;            // the vault's phase: 0 from 90%, 1 from 60% (avatars), 2 from 30% (wrath)
     this.gateIdx = 0;
     this.act = null;
@@ -115,6 +123,8 @@ export class VagelBoss extends Monster {
     super.spawnAt(x, z, parent);
     this.hz = new Hazards(parent);
     this.sp = new Spells(parent);
+    this.story = vagelStory();
+    if (this.story) this.story.bind(this);
     this.seat();
   }
 
@@ -136,8 +146,8 @@ export class VagelBoss extends Monster {
   // (asked by player.dealDamage first: while she sits, talks, changes phase or blinks, blows do nothing)
   immune() {
     if (this.dead) return null;
-    if (this.stage === 'dormant' || this.stage === 'intro' || this.stage === 'shift') return 'Immune';
-    if (this.gatePending || (this.act && (this.act.name === 'split' || this.act.name === 'wrath'))) return 'Immune';
+    if (this.stage !== 'throne' && this.stage !== 'vault') return 'Immune';
+    if (this.gatePending || (this.act && this.act.name === 'split')) return 'Immune';
     if (this.blinkA || this.model.vanish > 0.5) return 'Miss';
     return null;
   }
@@ -163,32 +173,92 @@ export class VagelBoss extends Monster {
       if (g !== undefined && this.hp - dmg <= max * g) { this.hp = Math.ceil(max * g); this.gatePending = true; }
       else {
         this.hp -= dmg;
-        if (this.hp <= 0) { this.hp = 0; this.die(from); return; }
+        if (this.hp <= 0) { this.hp = 0; G.emit('monsterHp', this); this.defeat(from); return; }
       }
     }
     if (this.hitReactT <= 0) { this.model.hit(); this.hitReactT = 0.9; }
     G.emit('monsterHp', this);
   }
 
-  die(killer) {
-    this.endAction();
+  // ---------------------------------------------------------------- her fall
+  // She is not killed: beaten, she folds over, rears up for her vow to return and vanishes in a sliver of light; her
+  // treasure stays behind in a chest (the scene: vagelStory.js)
+  die(killer) { this.defeat(killer); }
+  defeat(killer) {
+    if (this.dead || this.stage === 'defeat') return;
+    this.endAction(); this.cancelBlink();
     this.hz.clear(); this.sp.clear();
-    this.blinkA = null; this.model.vanish = 0;
+    for (const img of this.images) if (!img.dead) img.die();
+    this.images = [];
+    this.stage = 'defeat';
     this.engaged = false;
-    this.stage = 'dead';
-    super.die(killer);
-    this.say(LINES.death);
+    this.killer = killer;
+    if (G.player.target === this) G.player.setTarget(null);
     G.audio.play('shatter');
-    G.audio.play('coins');
     G.cam.addShake(0.5);
+    this.cs = this.story ? this.story.defeat(this, () => this.afterDefeat()) : null;
+    if (!this.cs) { this.vanishNow(); G.loot.dropFrom(this); this.afterDefeat(); }
+  }
+  falter() {
+    const m = this.model;
+    m.setHover(false); m.setCast(0, 0); m.setRise(0);
+    m.play('vg_falter');
+    G.audio.play('hurt');
+  }
+  vow() {
+    const m = this.model;
+    m.setHover(true); m.setRise(1.2);
+    m.setEyes(true); m.setRage(true);
+    m.play('vg_vow');
+    G.audio.play('eyes');
+    const c = V3(this.pos.x, this.floorY, this.pos.z);
+    G.fx.ring(c, { color: '#ffd24a', from: 0.5, to: 9, life: 0.8 });
+    for (let i = 0; i < 60; i++) {
+      const a = Math.random() * TAU, r = 1 + Math.random() * 3;
+      G.fx.particles.emit({ x: c.x + Math.cos(a) * r, y: c.y + Math.random() * 0.5, z: c.z + Math.sin(a) * r, vx: -Math.sin(a) * 3, vz: Math.cos(a) * 3, vy: 2 + Math.random() * 4, life: 1.6, size: 0.35, color: Math.random() < 0.7 ? GOLD : VIOLET, drag: 0.6, grav: 0 });
+    }
+  }
+  // she is gone (monsters.js removes her once the model has squeezed into light; her respawn timer starts)
+  vanishNow() {
+    if (this.dead) return;
+    const m = this.model, c = V3(this.pos.x, this.floorY + m.lift + 2.2, this.pos.z);
+    m.vanishOut();
+    m.setEyes(false); m.setRage(false); m.setCast(0, 0);
+    G.fx.particles.burst(c.x, c.y, c.z, 90, { color: GOLD, speed: 9, life: 1.1, size: 0.45, grav: -3, up: 0.4 });
+    G.fx.particles.burst(c.x, c.y, c.z, 50, { color: VIOLET, speed: 6, life: 1.2, size: 0.5, grav: -1, up: 0.6 });
+    G.fx.pillar(V3(this.pos.x, this.floorY, this.pos.z), '#ffe6a0', 2, 1.6, 26);
+    G.fx.shockwave(V3(this.pos.x, this.floorY, this.pos.z), '#ffd24a');
+    G.audio.play('vanish'); G.audio.play('coins');
+    G.cam.addShake(0.6);
+    this.dead = true;
+    this.state = 'dead';
+    this.stage = 'dead';
+    this.deathT = 0;
+    G.emit('monsterKilled', this);
+  }
+  // (once her scene is over or skipped) the hero's experience — her loot waits in her chest — and the news
+  afterDefeat() {
+    this.cs = null;
+    this.vanishNow();
+    if (this.rewarded) return;
+    this.rewarded = true;
     const p = G.player;
-    const first = p && !p.flags[VAGEL_FLAG];
-    if (p) p.flags[VAGEL_FLAG] = true;
-    G.ui?.centerMsg('Vagel, Goddess of Greed, has fallen!', 4);
+    if (!p) return;
+    if (this.killer === p) {
+      const diff = this.level - p.level;
+      let exp = this.stats.exp;
+      if (diff <= -5) exp = Math.max(1, Math.round(exp * 0.2));
+      else if (diff < 0) exp = Math.round(exp * (1 + diff * 0.12));
+      else exp = Math.round(exp * (1 + diff * 0.1));
+      p.gainExp(exp);
+    }
+    const first = !p.flags[VAGEL_FLAG];
+    p.flags[VAGEL_FLAG] = true;
+    G.ui?.centerMsg('Vagel, Goddess of Greed, has been defeated!', 4);
     G.msg('Her vault loses its greedy glow... the seal on its portal breaks.', 'quest');
     if (first) G.msg('The Tower of Isel is free of its goddess. For now.', 'quest');
     G.emit('bossDefeated', this);
-    p?.save();
+    p.save();
   }
 
   // back onto her throne, healed (the hero was knocked out or left the fight). Without a reason (the raccoon cheat
@@ -203,13 +273,15 @@ export class VagelBoss extends Monster {
     this.engaged = false;
     this.stage = 'dormant';
     this.target = null;
-    this.phase = 1; this.vphase = 0; this.gateIdx = 0;
+    this.phase = 1; this.vphase = 0; this.gateIdx = 0; this.power = 1;
     this.shiftPending = this.gatePending = false;
     this.endAction();
     this.hz.clear(); this.sp.clear();
     this.hp = this.stats.maxHp;
     G.emit('monsterHp', this);
     this.sparkle(this.pos, 30);
+    this.model.setEyes(false);
+    if (this.story) this.story.reset();
     this.seat();
   }
 
@@ -232,13 +304,15 @@ export class VagelBoss extends Monster {
     this.cs = new Cutscene(steps, { onEnd: () => this.beginThrone(retry) });
     this.cs.play();
   }
-  // the hero walks up the hall while she talks from her throne; she rises for the last lines
+  // the hero walks up the hall while she talks from her throne; she rises, shows off her hostage (Prince Ratman in
+  // his cage: vagelStory.js) and gets ready
   introSteps() {
     const L = LINES.intro, m = this.model;
     return [
       { shot: SHOTS.hall, run: () => { this.walkIn(); m.sit(true); }, say: say(L[0]) },
       { shot: SHOTS.seated, say: say(L[1]) },
       { shot: SHOTS.rise, run: () => this.rise(), until: () => this.body === 'float', say: say(L[2]) },
+      ...(this.story ? this.story.introSteps(this) : []),
       { shot: SHOTS.wings, run: () => m.play('vg_spread'), say: say(L[3]) },
       { shot: SHOTS.over, run: () => { m.play('vg_laugh'); G.audio.play('laugh'); }, say: say(L[4]) },
     ];
@@ -248,6 +322,8 @@ export class VagelBoss extends Monster {
     return [
       { shot: { ...SHOTS.seated, dur: 1.6 }, run: () => { this.walkIn(); m.sit(true); }, say: say(L[0]) },
       { shot: SHOTS.rise, run: () => this.rise(), until: () => this.body === 'float', say: say(L[1]) },
+      // (a hero who met her before she kept a hostage still gets to see him)
+      ...(this.story ? this.story.introSteps(this) : []),
     ];
   }
   walkIn() {
@@ -362,6 +438,7 @@ export class VagelBoss extends Monster {
     G.audio.play('teleport');
     G.fx.pillar(V3(VA.hero.x, this.floorY, VA.hero.z), '#e6c8ff', 1.4, 0.9, 8);
     this.sparkle(this.pos, 30);
+    if (this.story) this.story.warp();          // (her hostage comes along)
   }
   beginVault() {
     this.cs = null;
@@ -408,27 +485,65 @@ export class VagelBoss extends Monster {
     }
     this.images = this.images.filter((i) => !i.dead);
   }
-  // 30%: her wrath (the halo burns; next comes the Seraph Blades)
+  // 30%: her wrath. Her eyes blaze, the halo burns, she grows stronger and draws her avatars back into herself; then
+  // comes the scene with Sir Ratman and the Robo S-Card (vagelStory.js). Next in her rotation: the Seraph Blades
   enrage() {
+    this.stage = 'wrath';
+    this.hz.clear(); this.sp.clear();
+    this.cs = this.story ? this.story.wrath(this, () => this.endWrath()) : null;
+    if (!this.cs) { this.wrathStart(); this.say(LINES.enrage); this.endWrath(); }
+  }
+  wrathStart() {
+    if (this.phase === 2) return;
     this.phase = 2; this.vphase = 2;
+    this.power = WRATH_POWER;
     const m = this.model;
-    m.setRage(true);
-    m.play('vg_raise');
-    this.say(LINES.enrage);
-    G.audio.play('divine');
+    m.setRage(true); m.setEyes(true);
+    m.play('vg_raise'); m.setCast(1, 1);
+    G.audio.play('divine'); G.audio.play('eyes');
     const c = V3(this.pos.x, this.floorY, this.pos.z);
     G.fx.shockwave(c, '#ffd24a');
-    G.fx.pillar(c, '#ffe6a0', 1.6, 1.4, 22);
     this.shake(0.8);
-    this.specialT = 1.2; this.specialIdx = 0;
+    this.absorbImages();
+  }
+  // her avatars stream back into her as gold
+  absorbImages() {
+    for (const img of this.images) {
+      if (img.dead) continue;
+      const a = V3(img.pos.x, img.floorY + 2, img.pos.z), b = V3(this.pos.x, this.floorY + 2.2, this.pos.z);
+      for (let i = 0; i < 45; i++) {
+        const u = Math.random() * 0.3, life = 0.7 + Math.random() * 0.3;
+        const x = a.x + (b.x - a.x) * u, y = a.y + (b.y - a.y) * u + (Math.random() - 0.5), z = a.z + (b.z - a.z) * u;
+        G.fx.particles.emit({ x, y, z, vx: (b.x - x) / life, vy: (b.y - y) / life, vz: (b.z - z) / life, life, size: 0.35, color: GOLD, grav: 0, drag: 0 });
+      }
+      img.die();
+    }
+    this.images = [];
+  }
+  // (in the scene) the power of a goddess surges through her
+  powerSurge() {
+    const m = this.model, c = V3(this.pos.x, this.floorY, this.pos.z);
+    m.play('vg_spread'); m.setCast(1, 1);
+    G.fx.pillar(c, '#ffe6a0', 2.2, 1.6, 24);
+    G.fx.shockwave(c, '#ffb040');
+    G.audio.play('judgement');
+    this.shake(0.9);
+  }
+  endWrath() {
+    this.cs = null;
+    if (this.dead || this.stage !== 'wrath') return;
+    this.wrathStart();
+    this.model.setCast(0, 0);
+    this.stage = 'vault';
+    this.specialT = 2.5; this.specialIdx = 0;
     this.attackCd = 2.2;
-    this.act = { name: 'wrath', t: 0, done: {}, dur: 1.8 };
+    this.blinkT = 6; this.clingT = 0;
   }
 
   // ---------------------------------------------------------------- helpers
   hurt(mult, opts = {}) {
     const [a0, a1] = this.stats.atk;
-    G.player.takeDamage((a0 + Math.random() * (a1 - a0)) * mult, this, opts);
+    G.player.takeDamage((a0 + Math.random() * (a1 - a0)) * mult * this.power, this, opts);
   }
   shake(amount, x = this.pos.x, z = this.pos.z) {
     const d = Math.hypot(G.player.pos.x - x, G.player.pos.z - z);
@@ -453,8 +568,10 @@ export class VagelBoss extends Monster {
     G.fx.ring(V3(pos.x, this.floorY, pos.z), { color: '#e0b0ff', from: 0.4, to: 3, life: 0.4 });
   }
   inVault() { return Math.hypot(this.pos.x - VAULT.x, this.pos.z - VAULT.z) < VAULT.r; }
-  // may she float / blink / aim a spell at (x, z)? (the vault disc, or the east end of the throne room)
+  // may she float / blink / aim a spell at (x, z)? (the vault disc, or the east end of the throne room; never into
+  // her hostage's cage or onto Sir Ratman)
   inArena(x, z, margin = 0) {
+    if (this.story && this.story.blocks(x, z, margin)) return false;
     if (this.stage === 'vault') return Math.hypot(x - VAULT.x, z - VAULT.z) < VAULT.walk - margin && G.nav.isWalkable(x, z);
     return x > 10 + margin && x < 32 - margin && z > HALL.z0 + 2 + margin && z < HALL.z1 - 2 - margin && G.nav.isWalkable(x, z);
   }
@@ -744,7 +861,7 @@ export class VagelBoss extends Monster {
     if (this.dotT < 0.5) return;
     this.dotT = 0;
     const p = G.player;
-    p.takeDamage(Math.max(4, p.stats.maxHp * 0.025), this, { sure: true, pierce: true });
+    p.takeDamage(Math.max(4, p.stats.maxHp * 0.025) * this.power, this, { sure: true, pierce: true });
     G.fx.particles.burst(p.pos.x, p.pos.y + 0.3, p.pos.z, 8, { color: VIOLET, speed: 2, life: 0.6, size: 0.35, grav: 1.5, up: 1 });
   }
   // Greed's Grasp: a golden chain pulls the hero in while the circle around her fills, then it bursts
@@ -903,7 +1020,7 @@ export class VagelBoss extends Monster {
       if (G.terrain.where(p.pos.x, p.pos.z) !== 'vault') this.reset(false, LINES.flee);
       else if (this.gatePending) this.passGate();
       else this.fight(dt, p, dist, dx, dz);
-    }
+    } else if (this.stage === 'wrath' || this.stage === 'defeat') this.faceGoal = Math.atan2(dx, dz);   // (their scenes)
     if (this.body === 'rise') {
       this.riseT += dt;
       if (this.riseT >= 0.8) {

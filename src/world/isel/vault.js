@@ -2,7 +2,8 @@
 // a violet sky full of stars and nebulae. Gilded columns (some broken) stand around it, mounds of coins and chests
 // lie along the low balustrade, corrupted crystals break through the floor, a golden halo turns high above, rocks
 // drift around the platform and gold dust rises everywhere. The way back is a portal on the south rim, sealed with
-// gold and violet light while she fights. Everything goes into the "vault" visibility zone (shown only in here).
+// gold and violet light while she fights; once her hostage, Prince Ratman, is free, a second portal (home to Roumen)
+// rises out of the floor beside the great hoard. Everything goes into the "vault" visibility zone (shown only in here).
 import * as THREE from 'three';
 import { GeoBuilder, pm, U, unitGeo } from '../town/builder.js';
 import { marbleTex } from '../town/textures.js';
@@ -550,7 +551,8 @@ export function buildVault(ctx, decor) {
   seal.renderOrder = 5;
   portal.group.add(seal);
   const vagel = () => G.monsters && G.monsters.list.find((m) => m.type === 'vagel');
-  const locked = () => { const v = vagel(); return !!(v && !v.dead && (v.stage === 'vault' || v.stage === 'shift')); };
+  const FIGHT = ['shift', 'vault', 'wrath', 'defeat'];
+  const locked = () => { const v = vagel(); return !!(v && !v.dead && FIGHT.includes(v.stage)); };
   portal.locked = locked;
   portal.lockedMsg = 'A seal of gold and violet light covers the portal. While Vagel stands, there is no way out.';
   portal.onUse = () => {
@@ -568,6 +570,45 @@ export function buildVault(ctx, decor) {
     });
   };
 
+  // ---- the way home: a portal to Roumen that rises out of the floor once Prince Ratman is free (shown and hidden by
+  // entities/bosses/vagelStory.js; while hidden it is no portal at all: no colliders, not in the world's list)
+  const H = VAULT.home;
+  const home = createPortal({ id: 'vault_home', name: 'Roumen', x: H.x, y: VAULT.y, z: H.z, rotY: H.rotY });
+  home.dest = 'roumen';
+  home.hidden = true;
+  home.group.visible = false;
+  group.add(home.group);
+  const hc = Math.cos(H.rotY), hs = Math.sin(H.rotY);
+  let homeCols = null, homeRise = -1;
+  const homeCtl = {
+    portal: home,
+    portals: null,                          // (the world's portal list, set by index.js)
+    get shown() { return !home.hidden; },
+    show(rise = false) {
+      if (!home.hidden) return;
+      home.hidden = false;
+      home.group.visible = true;
+      homeCols = [-1, 1].map((sx) => col.addCircle(H.x + hc * sx * 2.35, H.z - hs * sx * 2.35, 0.6));
+      if (this.portals && !this.portals.includes(home)) this.portals.push(home);
+      homeRise = rise ? 0 : -1;
+      home.group.position.y = rise ? VAULT.y - 7 : VAULT.y;
+      if (rise) {
+        const p = new THREE.Vector3(H.x, VAULT.y, H.z);
+        G.fx.pillar(p, '#8affc0', 2.4, 2.2, 14);
+        G.fx.shockwave(p, '#8affc0');
+        G.audio.play('teleport');
+      }
+    },
+    hide() {
+      if (home.hidden) return;
+      home.hidden = true;
+      home.group.visible = false;
+      for (const c of homeCols || []) col.remove(c);
+      homeCols = null;
+      if (this.portals) { const i = this.portals.indexOf(home); if (i >= 0) this.portals.splice(i, 1); }
+    },
+  };
+
   const tris = Math.round(b.triangleCount() + bn.triangleCount());
   b.flush(Z.batcher);
   bn.flush(Z.batcherNoShadow);
@@ -578,6 +619,7 @@ export function buildVault(ctx, decor) {
   let wasLocked = null;
   return {
     portal,
+    home: homeCtl,
     stats: `${tris} tris, ${NC} coins`,
     update(dt, t, camera) {
       if (!group.visible) return;
@@ -605,6 +647,20 @@ export function buildVault(ctx, decor) {
         }
       }
       portal.update(dt, t, fx);
+      if (!home.hidden) {
+        if (homeRise >= 0) {
+          // rising out of the marble, the ground shaking a little
+          homeRise += dt;
+          const k = Math.min(1, homeRise / 2.2);
+          home.group.position.y = VAULT.y - 7 * Math.pow(1 - k, 3);
+          if (fx && k < 1) for (let i = 0; i < 3; i++) {
+            const a = Math.random() * TAU, r = 2.6 + Math.random() * 1.2;
+            fx.particles.emit({ x: H.x + Math.cos(a) * r, y: 0.1, z: H.z + Math.sin(a) * r, vx: Math.cos(a) * 1.5, vy: 1.5 + Math.random() * 2, vz: Math.sin(a) * 1.5, life: 0.9, size: 0.45, endSize: 0.8, color: GOLD, grav: -3, drag: 1.5, alpha: 0.6 });
+          }
+          if (k >= 1) homeRise = -1;
+        }
+        home.update(dt, t, fx);
+      }
       const l = locked();
       if (wasLocked === true && !l) {
         seal.getWorldPosition(_p);

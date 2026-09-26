@@ -100,7 +100,7 @@ async function init() {
   // other worlds are built on their first visit (see world/worlds.js)
   registerBuilder('cyclone', async (progress) => {
     await progress(2, 'Summoning the locals…');
-    try { await preloadNpcModels(['ratman', 'robo', 'ratman_mob', 'eber']); } catch (e) { console.warn('NPC models', e); }
+    try { await preloadNpcModels(['ratman', 'robo', 'ratman_mob', 'eber', 'ratprince']); } catch (e) { console.warn('NPC models', e); }
     try { const { preloadCumbot } = await import('./entities/bosses/cumbot.js'); await preloadCumbot(); } catch (e) { console.warn('Cumbot 9000', e); }
     const { buildCycloneWorld } = await import('./world/cyclone/index.js');
     const { SPAWN_ZONES: CYCLONE_SPAWNS } = await import('./world/cyclone/layout.js');
@@ -113,14 +113,21 @@ async function init() {
   });
   registerBuilder('isel', async (progress) => {
     await progress(2, 'Something stirs on the throne…');
-    let vagel = false;
-    try { const { preloadVagel, vagelReady } = await import('./entities/bosses/vagel.js'); await preloadVagel(); vagel = vagelReady(); } catch (e) { console.warn('Vagel', e); }
+    let vagel = false, attachStory = null;
+    try {
+      const V = await import('./entities/bosses/vagel.js');
+      await Promise.all([V.preloadVagel(), V.preloadVagelStory()]);      // (her, Sir Ratman, his son, Robo, the card)
+      vagel = V.vagelReady();
+      attachStory = V.attachVagelStory;
+    } catch (e) { console.warn('Vagel', e); }
     const { buildIselWorld } = await import('./world/isel/index.js');
     const { SPAWN_ZONES: ISEL_SPAWNS } = await import('./world/isel/layout.js');
     const w = await buildIselWorld({ engine, progress });
     w.root.visible = false;
     engine.scene.add(w.root);
     w.npcs = new NpcManager([], { parent: w.root, terrain: w.terrain, colliders: w.colliders });
+    // her hostage and everything around her last fight (before her: she finds the story when she spawns)
+    if (vagel && attachStory) { try { attachStory(w); } catch (e) { console.warn('Vagel story', e); } }
     w.monsters = new MonsterManager(vagel ? ISEL_SPAWNS : [], w.root);   // (Vagel on her throne; spawned on the first visit)
     return w;
   });
@@ -343,7 +350,7 @@ function pickEntity(mx, my) {
   for (const m of G.monsters.list) if (!m.dead) test(m, m.pos.x, m.groundY + m.height * 0.5, m.pos.z, Math.max(m.radius * 1.1, m.height * 0.55));
   for (const n of G.npcs.list) test(n, n.pos.x, n.pos.y + n.height * 0.5, n.pos.z, 0.75);
   for (const l of G.loot.list) test(l, l.pos.x, l.pos.y + 0.25, l.pos.z, 0.55);
-  for (const p of G.portals) test(p, p.pos.x, p.pos.y + 2.6, p.pos.z, 1.9);
+  for (const p of G.portals) if (!p.hidden) test(p, p.pos.x, p.pos.y + 2.6, p.pos.z, 1.9);
   return best;
 }
 function pickGround(mx, my) {

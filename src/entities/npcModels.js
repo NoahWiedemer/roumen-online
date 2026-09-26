@@ -1,7 +1,8 @@
 // Skinned NPC models (auto-rigged GLBs without clips, retargeted by skinnedRig.js):
-//   ratman — Sir Ratman, the rat knight wandering in the Forest of Mist (pickaxe is part of the mesh)
-//   robo   — Robo, King of Beasts, a werewolf at the foot of Cyclone Hill (his twin blades are part of the mesh)
-// Both are drawn a few heads taller than the player via `scale`.
+//   ratman    — Sir Ratman, the rat knight wandering in the Forest of Mist (pickaxe is part of the mesh)
+//   robo      — Robo, King of Beasts, a werewolf at the foot of Cyclone Hill (his twin blades are part of the mesh)
+//   ratprince — Prince Ratman, Sir Ratman's son (Vagel's hostage in the Tower of Isel)
+// They are drawn a few heads taller than the player via `scale`.
 import { loadSkinnedTemplate, createSkinnedRig } from './skinnedRig.js';
 
 const BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
@@ -107,6 +108,27 @@ const SPECS = {
     material(mat) {
       // the gold trim keeps its metal map (it shines with the environment reflection set by the boss model)
       mat.roughness = 0.7;
+      mat.needsUpdate = true;
+    },
+  },
+  // Prince Ratman, Sir Ratman's son (user's Meshy "Rat Prince", a Mixamo-style biped rig; the clips it came with
+  // are dropped, the joint names lost their "mixamorig:" prefix). Faces +Z, left side +X, arms in an A-pose
+  ratprince: {
+    url: BASE + 'models/ratprince.glb', rootBone: 'Hips', recenter: true, scale: 1.2, portraitY: 1.5, portraitDist: 0.8,
+    boneMap: {
+      hips: 'Hips', spine: 'Spine', chest: 'Spine2', neck: 'Neck', head: 'Head',
+      armL: 'LeftArm', elbowL: 'LeftForeArm', handL: 'LeftHand',
+      armR: 'RightArm', elbowR: 'RightForeArm', handR: 'RightHand',
+      legL: 'LeftUpLeg', kneeL: 'LeftLeg', footL: 'LeftFoot',
+      legR: 'RightUpLeg', kneeR: 'RightLeg', footR: 'RightFoot',
+    },
+    segmentEnd: {
+      armL: 'LeftForeArm', elbowL: 'LeftHand', handL: 'LeftHandMiddle4', armR: 'RightForeArm', elbowR: 'RightHand', handR: 'RightHandMiddle4',
+      legL: 'LeftLeg', kneeL: 'LeftFoot', legR: 'RightLeg', kneeR: 'RightFoot',
+    },
+    segmentUp: { hips: 'Spine', spine: 'Spine1', chest: 'Neck', neck: 'Head' },
+    material(mat) {
+      mat.roughness = 0.75;
       mat.needsUpdate = true;
     },
   },

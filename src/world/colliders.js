@@ -35,6 +35,14 @@ export class Colliders {
     this._insert(o, x - ex, z - ez, x + ex, z + ez);
     return o;
   }
+  // take a collider out again (things that come and go: a cage, a chest, a portal rising later)
+  remove(o) {
+    if (!o) return;
+    const list = o.type === 'c' ? this.circles : this.boxes;
+    const i = list.indexOf(o);
+    if (i >= 0) list.splice(i, 1);
+    for (const cell of this.grid.values()) { const k = cell.indexOf(o); if (k >= 0) cell.splice(k, 1); }
+  }
   near(x, z) {
     const c = this.cell;
     return this.grid.get(this._key(Math.floor(x / c), Math.floor(z / c))) || [];

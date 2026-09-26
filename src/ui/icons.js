@@ -2184,6 +2184,38 @@ const ITEMS = {
       sparkle(ctx, 45, 24, 4, '#ffffff');
     });
   },
+  // Sir Ratman's trump card: Robo, King of Beasts, on an S-rank card (gold frame, violet field, the grey wolf with his
+  // white mane, the blue text band with its stars)
+  robo_card(ctx) {
+    itemFrame(ctx, '#c86aff', () => {
+      obj(ctx, (l) => {
+        const g = M.gold;
+        l.save(); l.translate(51, 51); l.rotate(-0.13);
+        rr(l, -25, -37, 50, 74, 5); l.fillStyle = lin(l, -25, -37, 25, 37, [g.hi, g.a, g.b, g.lo]); l.fill();
+        l.lineWidth = 1; l.strokeStyle = g.line; l.stroke();
+        rr(l, -20, -29, 40, 44, 2); l.fillStyle = lin(l, 0, -29, 0, 15, ['#f08aff', '#b03ae8', '#4a0a70']); l.fill();
+        // the wolf: white mane, grey head with a long snout, two tall ears, a red eye
+        smooth(l, [[-15, 2], [-6, 15], [10, 15], [18, 2], [12, -9], [-8, -6]]);
+        l.fillStyle = lin(l, 0, -9, 0, 15, ['#ffffff', '#e0dcd6', '#a8a29a']); l.fill();
+        poly(l, [[-7, -17], [-4, -30], [1, -17]]); l.fillStyle = lin(l, 0, -30, 0, -17, ['#b8b2ac', '#6a625c']); l.fill();
+        poly(l, [[5, -16], [11, -29], [12, -12]]); l.fill();
+        smooth(l, [[-13, -7], [-9, -17], [1, -20], [11, -13], [12, -3], [4, 3], [-8, 1]]);
+        l.fillStyle = rad(l, -2, -14, 1, 0, -8, 16, ['#b0aaa4', '#7a726c', '#453e3a']); l.fill();
+        smooth(l, [[-12, -8], [-21, -3], [-17, 2], [-7, 1]]); l.fillStyle = lin(l, -21, 0, -7, 0, ['#6a625c', '#8a837c']); l.fill();
+        circle(l, -20, -3, 1.9); l.fillStyle = '#1a1210'; l.fill();
+        circle(l, -4, -10, 1.3); l.fillStyle = '#ff3a2a'; l.fill();
+        // text band, stars, the S badge
+        rr(l, -20, 18, 40, 14, 2); l.fillStyle = '#1c2254'; l.fill();
+        for (let i = 0; i < 5; i++) { starPath(l, -14 + i * 7, 24, 5, 2.6, 1.2); l.fillStyle = g.a; l.fill(); }
+        circle(l, -19, -31, 7); l.fillStyle = rad(l, -21, -33, 1, -19, -31, 7, [g.hi, g.a, g.b]); l.fill();
+        l.lineWidth = 0.9; l.strokeStyle = g.line; l.stroke();
+        l.font = '900 10px Georgia, serif'; l.textAlign = 'center'; l.textBaseline = 'middle'; l.fillStyle = '#5a2a02'; l.fillText('S', -19, -30.5);
+        l.restore();
+        gloss(l, 36, 26, 8, 4, -0.8, 0.7);
+      }, { glow: '#e0a0ff', glowR: 6, glowA: 0.75 });
+      sparkle(ctx, 74, 20, 5, '#ffffff', '#ffe890');
+    });
+  },
   necklace_jade(ctx) {
     itemFrame(ctx, '#40e090', () => {
       obj(ctx, (l) => {
@@ -3039,6 +3071,25 @@ function sparkleAt(ctx, x, y, r) { sparkle(ctx, x, y, r, '#ffffff', '#ffe890'); 
 /* ================================================================== */
 const BOW = 4.6;
 const BUFFS = {
+  // the Robo S-Card's blessing: a golden paw print in a burst of holy light
+  beast_blessing(ctx) {
+    buffFrame(ctx, ['#fffbe0', '#ffc83a', '#7a3a04'], false, () => {
+      ctx.save(); ctx.translate(50, 54);
+      for (let i = 0; i < 12; i++) {
+        ctx.rotate(TAU / 12);
+        ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(0, -48); ctx.lineTo(3, 0); ctx.closePath();
+        ctx.fillStyle = 'rgba(255,250,220,0.35)'; ctx.fill();
+      }
+      ctx.restore();
+      obj(ctx, (l) => {
+        const g = M.gold;
+        ell(l, 50, 64, 17, 14); l.fillStyle = rad(l, 45, 58, 1, 50, 64, 18, [g.hi, g.a, g.b]); l.fill();
+        [[31, 44, 7, 9, -0.35], [43, 34, 7, 10, -0.1], [57, 34, 7, 10, 0.1], [69, 44, 7, 9, 0.35]].forEach(([x, y, rx, ry, r]) => {
+          ell(l, x, y, rx, ry, r); l.fillStyle = rad(l, x - 2, y - 3, 1, x, y, ry, [g.hi, g.a, g.b]); l.fill();
+        });
+      }, { ow: 3.6, glow: '#fff0a0', glowR: 6 });
+    });
+  },
   iron_skin(ctx) {
     buffFrame(ctx, ['#a8e4ff', '#2a70d0', '#0a1a48'], false, () => {
       obj(ctx, (l) => {

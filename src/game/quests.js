@@ -31,6 +31,7 @@ export class QuestLog {
     if (g.type === 'kill') return a.progress >= g.count;
     if (g.type === 'collect') return G.player.countItem(g.item) >= g.count;
     if (g.type === 'talk') return true;
+    if (g.type === 'flag') return !!G.player.flags[g.flag];      // a story event (e.g. the prince freed)
     return false;
   }
   progressText(id) {
@@ -39,6 +40,7 @@ export class QuestLog {
     if (g.type === 'kill') return `${MONSTERS[g.target]?.name || cap(g.target)} defeated: ${Math.min(a ? a.progress : 0, g.count)} / ${g.count}`;
     if (g.type === 'collect') return `${ITEMS[g.item].name}: ${Math.min(G.player.countItem(g.item), g.count)} / ${g.count}`;
     if (g.type === 'talk') return `Talk to ${G.npcs.get(g.npc)?.title || ''} ${G.npcs.get(g.npc)?.name || ''}`;
+    if (g.type === 'flag') return `${g.label}: ${G.player.flags[g.flag] ? 'done' : 'not yet'}`;
     return '';
   }
   // quests this NPC can give or accept
@@ -83,6 +85,12 @@ export class QuestLog {
     this.refresh();
     p.save();
     return true;
+  }
+  // a story moment hands the quest in on the spot (even if it was never picked up); false if the bag is full
+  finish(id) {
+    if (this.done.has(id)) return true;
+    if (!this.active[id]) this.active[id] = { progress: 0 };
+    return this.complete(id);
   }
   onKill(m) {
     let changed = false;

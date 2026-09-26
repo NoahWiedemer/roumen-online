@@ -183,6 +183,9 @@ export const ITEMS = {
   ring_copper: { name: 'Copper Ring', type: 'ring', icon: 'ring_copper', lv: 1, str: 1, price: 200, desc: 'STR +1' },
   ring_ruby: { name: 'Ruby Ring', type: 'ring', icon: 'ring_ruby', lv: 10, str: 3, hp: 20, price: 5000, desc: 'STR +3, HP +20' },
   ring_avarice: { name: 'Ring of Avarice', type: 'ring', icon: 'ring_avarice', lv: 14, str: 3, dex: 3, hp: 40, price: 14000, desc: 'STR +3, DEX +3, HP +40. Vagel\'s own ring. It never stops asking for more.' },
+  // Sir Ratman's trump card in the fight against Vagel (a keepsake: it cannot be sold)
+  robo_card: { name: 'Robo S-Card', type: 'material', icon: 'robo_card', price: 0, keepsake: true,
+    desc: 'S-rank. "The mighty Robo is the King of Beasts — only fools think he is a robot." A gift of the King of Beasts, passed on to you by Sir Ratman. When greed itself rises against you, it blazes up.' },
   // test ring, only in the Raccoon Stash (cheat): no damage taken, but monsters fight back and hits deal normal damage
   ring_raccoon: { name: 'Raccoon Guard Ring', type: 'ring', icon: 'ring_raccoon', lv: 1, guard: true, price: 0,
     desc: 'A test ring from the Raccoon Stash. Endless defense: you take no damage at all, yet monsters still fight you and your blows hit as hard as usual.' },
@@ -331,16 +334,36 @@ export const NPCS = [
     greet: 'Still walking everywhere on foot? My critters could carry you — if you help us out a little first.' },
 
   // ---- Cyclone Hill / Forest of Mist (world: 'cyclone'; pos = world x,z instead of a Roumen map spot)
+  // (his son, Prince Ratman, is Vagel's hostage in the Tower of Isel: that is why he cannot fight her himself)
   { id: 'sir_ratman', world: 'cyclone', pos: [6, 146], rot: Math.PI, name: 'Sir Ratman', title: 'Rat Knight', model: 'ratman', roles: ['quest'],
     wander: { r: 9 }, art: '/art/sir_ratman.png',
     greet: 'Hm? A traveller in the Forest of Mist? How delightfully unexpected.',
+    firstGreet: 'Hm? A traveller in the Forest of Mist? Forgive an old knight his worries... My son, Prince Ratman, is held hostage by Vagel, the Goddess of Greed, up in the Tower of Isel. I could take that tower apart stone by stone — but one wrong move, and she would hurt my boy.',
     greetLines: [
       'Hm? A traveller in the Forest of Mist? How delightfully unexpected.',
       'Mind the mist, friend. It has a habit of swallowing the careless.',
       'They call me Sir Ratman. The "Sir" is self-appointed, but it stuck.',
       'Up on Cyclone Hill the wind never sleeps. Neither do the things that live there.',
-      'I shall have tasks for brave souls soon. Until then, enjoy the waterfalls.',
       'This pickaxe? Merely a gentleman\'s walking stick. Mostly.',
+      'Every night I look up at the Tower of Isel. My son is up there, in that witch\'s gilded cage.',
+      'If I so much as raise my pickaxe against Vagel, she will take it out on my boy. My paws are tied.',
+      'Vagel keeps my son like a coin in her purse: a hostage, so that I stay out of her way.',
+    ],
+    linesIf: { flag: 'prince:freed', lines: [
+      'My son is home! The rat-folk will sing of you for generations, hero.',
+      'Thanks to you, my people can finally live in peace again.',
+      'My boy will not stop talking about how you beat a goddess. Neither will I, frankly.',
+      'Robo\'s card served you well, I hear. The King of Beasts chose wisely when he trusted you.',
+    ] } },
+  // Prince Ratman, Sir Ratman's son: at his father's side once the hero has freed him from Vagel's vault
+  { id: 'prince_ratman', world: 'cyclone', pos: [9, 148.5], rot: Math.PI, name: 'Prince Ratman', title: 'Heir of the Rat-Folk', fullName: 'Prince Ratman', model: 'ratprince', roles: ['talk'],
+    requiresFlag: 'prince:freed',
+    greet: 'Father says I should thank you properly. So: thank you, hero! Truly!',
+    greetLines: [
+      'Father says I should thank you properly. So: thank you, hero! Truly!',
+      'Being a hostage was dreadful. Vagel counted her coins out loud. For hours. Every day.',
+      'One day I will be a knight like my father. Maybe even a real one, with a real "Sir".',
+      'That card you caught... I saw it blaze from inside my cage. I have never seen anything so bright.',
     ] },
   // Robo, King of Beasts: waits where the forest trail meets Cyclone Hill and hands out the Robo Blades once
   { id: 'robo', world: 'cyclone', pos: [10, 47], rot: -1.18, name: 'Robo', title: 'King of Beasts', model: 'robo', roles: ['quest'],
@@ -418,6 +441,13 @@ export const QUESTS = {
     text: 'Beyond the sky bridge, in the Windward Glade before the Tower of Isel, stands a jolly-looking machine called Cumbot 9000. Its humming clouds the minds of my people. Shut it down! Beware: it lobs sticky milk bombs, and whoever stands in the path of its cannon stream forgets how to move for a moment.',
     goal: { type: 'kill', target: 'cumbot', count: 1 },
     reward: { exp: 2400, copper: 6000, items: [['hp_potion_l', 5], ['sp_potion_l', 3]] },
+  },
+  // ... and after the goddess who keeps his son as her hostage (completed in her vault, where he thanks the hero)
+  q_prince: {
+    name: 'The Hostage Prince', giver: 'sir_ratman', level: 12,
+    text: 'My son, Prince Ratman, is Vagel\'s hostage. The Goddess of Greed keeps him in a cage of gold and magic in the Tower of Isel, and as long as she holds him, I cannot lift a paw against her. But you can. Climb the tower, face her, and bring my boy home.',
+    goal: { type: 'flag', flag: 'prince:freed', label: 'Free Prince Ratman' },
+    reward: { exp: 6000, copper: 15000, items: [['hp_potion_l', 5], ['sp_potion_l', 5]] },
   },
 };
 

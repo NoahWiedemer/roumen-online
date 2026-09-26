@@ -15,6 +15,12 @@ const el = (tag, cls, parent, html) => {
   return e;
 };
 
+// hover texts of buffs that need more than their id
+const BUFF_TITLES = {
+  beast_blessing: 'Beast Blessing — the Robo S-Card burns in you: +50% damage, double defense, half the damage of every blow, regeneration',
+  well_fed: 'Well fed — regenerating HP',
+};
+
 export const SLOT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
 export const SLOT_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
 
@@ -363,14 +369,15 @@ export class HUD {
     for (const b of list) {
       const d = el('div', 'buff', this.pfBuffs, `<img src="${buffIcon(b.id, 32)}"><span class="t"></span>`);
       d._buff = b;
-      d.title = b.id.replace('_', ' ');
+      d.title = BUFF_TITLES[b.id] || b.id.replace('_', ' ');
     }
   }
   updateBuffTimers() {
     for (const d of this.pfBuffs.children) {
       const b = d._buff;
       const t = d.querySelector('.t');
-      const txt = b.t > 0 ? (b.t >= 60 ? Math.ceil(b.t / 60) + 'm' : Math.ceil(b.t) + 's') : '';
+      // (auras last as long as their source, e.g. a fight: no countdown)
+      const txt = b.t > 0 && !b.data?.aura ? (b.t >= 60 ? Math.ceil(b.t / 60) + 'm' : Math.ceil(b.t) + 's') : '';
       if (t.textContent !== txt) t.textContent = txt;
     }
     // target debuffs

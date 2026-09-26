@@ -114,6 +114,16 @@ export class Audio {
       case 'divine': [262, 330, 392, 523, 659].forEach((f, i) => this.tone(f, 2.4, { type: 'sine', vol: 0.05, attack: 0.5, delay: i * 0.05 })); this.tone(131, 2.4, { type: 'triangle', vol: 0.05, attack: 0.6 }); break;
       case 'shatter': for (let i = 0; i < 8; i++) this.tone(2400 + Math.random() * 2600, 0.25 + Math.random() * 0.3, { type: 'sine', vol: 0.04, delay: Math.random() * 0.12 }); this.noiseBurst(0.5, { vol: 0.3, freq: 5200, q: 0.8, slide: 0.4 }); break;
       case 'coins': for (let i = 0; i < 10; i++) this.tone([1318, 1568, 1760, 2093][i % 4] * (0.97 + Math.random() * 0.06), 0.1, { type: 'square', vol: 0.03, delay: i * 0.045 + Math.random() * 0.02 }); break;
+      // her eyes blaze (a dark swell), vanishing in gold
+      case 'eyes': this.tone(73, 1.6, { type: 'sawtooth', vol: 0.09, attack: 0.3, slide: 1.5 }); this.tone(77.5, 1.6, { type: 'sawtooth', vol: 0.07, attack: 0.3, slide: 1.52 }); this.noiseBurst(1.2, { vol: 0.14, freq: 500, q: 0.8, type: 'lowpass', slide: 2.5, delay: 0.2 }); this.tone(1480, 0.5, { type: 'sine', vol: 0.05, delay: 0.9, slide: 0.8 }); break;
+      case 'vanish': this.noiseBurst(0.9, { vol: 0.22, freq: 600, q: 1.2, slide: 6 }); this.tone(220, 0.9, { type: 'sine', vol: 0.12, slide: 5 }); for (let i = 0; i < 6; i++) this.tone(2093 * (1 + i * 0.12), 0.35, { type: 'sine', vol: 0.03, delay: 0.55 + i * 0.05 }); break;
+      // Sir Ratman: a rift tearing open, the card drawn (a bright swish and a glint), its blessing, the spirit of Robo
+      case 'rift': this.noiseBurst(1.1, { vol: 0.3, freq: 300, q: 0.6, type: 'lowpass', slide: 4 }); this.tone(110, 1.0, { type: 'sawtooth', vol: 0.05, slide: 2.5 }); this.noiseBurst(0.6, { vol: 0.12, freq: 4200, q: 3, slide: 0.5, delay: 0.3 }); break;
+      case 'card': this.noiseBurst(0.22, { vol: 0.2, freq: 2600, q: 1.5, slide: 2.2 }); [1568, 2093, 2637, 3136].forEach((f, i) => this.tone(f, 0.4, { type: 'sine', vol: 0.05, delay: 0.12 + i * 0.05 })); break;
+      case 'blessing': [392, 523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(f, 1.6, { type: 'triangle', vol: 0.08, attack: 0.03, delay: i * 0.07 })); this.tone(196, 2.2, { type: 'sine', vol: 0.18, attack: 0.1 }); this.tone(98, 2.2, { type: 'sine', vol: 0.14, attack: 0.2 }); break;
+      case 'beast': this.tone(120, 1.3, { type: 'sawtooth', vol: 0.16, attack: 0.1, slide: 0.7 }); this.tone(180, 1.1, { type: 'square', vol: 0.05, attack: 0.12, slide: 0.65 }); this.noiseBurst(1.2, { vol: 0.3, freq: 520, q: 0.6, slide: 0.55 }); break;
+      // the treasure chest: a heavy lid, then gold
+      case 'chest': this.tone(140, 0.25, { type: 'square', vol: 0.05, slide: 1.6 }); this.noiseBurst(0.3, { vol: 0.12, freq: 900, q: 4, slide: 1.8 }); this.bells(0.25); break;
     }
   }
 

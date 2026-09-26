@@ -341,6 +341,7 @@ export class Windows {
     if (!cur) return;
     const def = ITEMS[cur.id];
     if (def.type === 'mount') { G.msg('You would never sell your trusty companion!', 'warn'); G.audio.play('error'); return; }
+    if (def.keepsake) { G.msg(`The ${def.name} is not for sale. Some things are worth more than gold.`, 'warn'); G.audio.play('error'); return; }
     const price = Math.max(1, Math.floor(def.price * 0.3)) * cur.n;
     p.inventory[idx] = null;
     p.money += price;
@@ -529,11 +530,15 @@ export class Windows {
   openNpc(npc) {
     this.npc = npc;
     this.npcPage = 'main';
-    const lines = npc.def.greetLines;
-    this.npcGreet = lines && lines.length ? lines[(Math.random() * lines.length) | 0] : npc.def.greet;
+    const def = npc.def, flags = G.player.flags;
+    // lines for a later chapter (def.linesIf = { flag, lines }), otherwise a random greeting; the very first talk
+    // can tell something important instead (def.firstGreet)
+    const lines = def.linesIf && flags[def.linesIf.flag] ? def.linesIf.lines : def.greetLines;
+    this.npcGreet = lines && lines.length ? lines[(Math.random() * lines.length) | 0] : def.greet;
+    if (def.firstGreet && !flags['met:' + npc.id] && !(def.linesIf && flags[def.linesIf.flag])) { this.npcGreet = def.firstGreet; flags['met:' + npc.id] = true; }
     this.open('npc');
-    this.get('npc').title.textContent = `${npc.title} ${npc.name}`;
-    this.showArt(npc.def.art || null);
+    this.get('npc').title.textContent = def.fullName || `${npc.title} ${npc.name}`;
+    this.showArt(def.art || null);
   }
   // large character illustration on the right side while talking
   showArt(url) {

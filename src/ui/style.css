@@ -162,6 +162,7 @@ canvas#game { display: block; position: fixed; inset: 0; outline: none; }
 #syslog .warn { color: #ffd15a; } #syslog .exp { color: #7dff6a; } #syslog .level { color: #ffe45a; font-size: 14px; }
 #syslog .stat { color: #9ae8ff; } #syslog .loot { color: #ffffff; } #syslog .quest { color: #ffb86a; } #syslog .skill { color: #c8a8ff; }
 #syslog .boss { color: #ff9ae6; font-size: 13.5px; white-space: normal; text-align: right; }
+#syslog .ally { color: #b8ffd8; font-size: 13.5px; white-space: normal; text-align: right; }
 
 /* boss bar (under the target frame while a boss fights the hero) */
 #bossbar { position: absolute; left: 50%; top: 106px; transform: translateX(-50%); width: 480px; text-align: center; }

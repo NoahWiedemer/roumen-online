@@ -28,6 +28,57 @@ function overlay(src) {
 }
 export function snap() { G.engine.render(); overlay(G.engine.renderer.domElement.toDataURL()); }
 
+// a hidden pane has no window size (innerWidth 0): give the renderer and the bloom composer a fixed one
+export function fit(w = 1280, h = 720) {
+  const E = G.engine;
+  E.renderer.setSize(w, h, false);
+  if (E.composer) E.composer.setSize(w, h);
+  E.camera.aspect = w / h;
+  E.camera.updateProjectionMatrix();
+}
+// frames of the current camera, collected and shown as a labelled grid (e.g. every step of a cutscene)
+const frames = [];
+export function capture(label = '') {
+  G.engine.render();
+  const src = G.engine.renderer.domElement, c = document.createElement('canvas');
+  c.width = 480; c.height = 270;
+  c.getContext('2d').drawImage(src, 0, 0, 480, 270);
+  frames.push({ c, label });
+  return frames.length;
+}
+export function grid(from = 0, n = 4, cols = 2) {
+  const F = frames.slice(from, from + n), w = 480, h = 270, cv = document.createElement('canvas');
+  cv.width = cols * w; cv.height = Math.ceil(F.length / cols) * h;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#000'; g.fillRect(0, 0, cv.width, cv.height);
+  g.font = 'bold 15px sans-serif';
+  F.forEach((f, i) => {
+    const x = (i % cols) * w, y = Math.floor(i / cols) * h;
+    g.drawImage(f.c, x, y);
+    g.fillStyle = '#000'; g.fillRect(x, y, g.measureText(f.label).width + 10, 20);
+    g.fillStyle = '#ff0'; g.fillText(f.label, x + 5, y + 15);
+  });
+  overlay(cv.toDataURL('image/jpeg', 0.85));
+  return frames.length;
+}
+export function clearFrames() { frames.length = 0; }
+// run the cutscene that is playing (or starts within maxFrames), capturing each of its steps `at` seconds in
+// (a number, or a function of the cutscene); returns the lines it showed
+export function playCutscene({ maxFrames = 6000, at = 1.8, label = '', each = null } = {}) {
+  let lastI = -2, done = false, n = 0;
+  const log = [];
+  for (; n < maxFrames; n++) {
+    const cs = G.cutscene;
+    if (!cs) { if (lastI > -2) break; step(1); continue; }
+    if (cs.i !== lastI) { lastI = cs.i; done = false; }
+    const s = cs.step, txt = s && s.say ? `${s.say.who}: ${s.say.text.slice(0, 40)}` : '(no text)';
+    if (!done && cs.outro < 0 && cs.t >= (typeof at === 'function' ? at(cs) : at)) { capture(`${label}${cs.i} ${txt}`); done = true; log.push(`${cs.i} ${txt}`); }
+    if (each) each(cs);
+    step(1);
+  }
+  return { frames: n, log };
+}
+
 // renders one follow-camera frame per setup call into a labelled grid: sheet([[label, () => {...}], ...])
 export function sheet(shots, { cols = 3, w = 400, h = 300, settle = 2 } = {}) {
   const cv = document.createElement('canvas');

@@ -84,7 +84,16 @@ export const VAULT = {
   boss: { x: 80, z: 22, rotY: 0 },
   portal: { x: 80, z: 54.2, rotY: Math.PI },      // the way back, on the south rim facing in
   back: { x: 18, z: -42, rotY: Math.PI / 2 },     // ... into the throne room, facing the throne
+  // her hostage, Prince Ratman, in his cage before the great hoard; where Sir Ratman steps out of his rift and
+  // guards the cage; where father and son meet again; the portal home to Roumen that rises after her fall
+  prison: { x: 80, z: 12.5 },
+  rift: { x: 87.6, z: 15.9 },
+  guard: { x: 84.3, z: 14.6 },
+  reunion: { prince: { x: 80.25, z: 16.1 }, sir: { x: 81.3, z: 16.4 } },
+  home: { x: 88.5, z: 17, rotY: -0.55 },
 };
+// ... and the same cage beside her throne while she waits there (on the dais, north of the throne)
+export const THRONE_PRISON = { x: 31.3, z: -47.8 };
 ZONE.vault = 'vault';
 // monsters of the tower: for now only its goddess, waiting on her throne (entities/bosses/vagel.js)
 export const SPAWN_ZONES = [{ id: 'boss_vagel', type: 'vagel', x: SEAT.x, z: SEAT.z, r: 0.5, count: 1, lv: [18, 18], rotY: SEAT.rotY }];

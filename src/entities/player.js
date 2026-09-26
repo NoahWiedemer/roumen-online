@@ -127,6 +127,8 @@ export class Player {
     G.emit('stats');
   }
   dmgMult() { let m = 1; for (const b of this.buffs) if (b.data.dmg) m += b.data.dmg; return m; }
+  // share of incoming damage that still lands (buffs with `ward` shield part of every blow)
+  wardMult() { let m = 1; for (const b of this.buffs) if (b.data.ward) m *= 1 - b.data.ward; return m; }
   allocate(stat) {
     if (this.statPoints <= 0) return;
     this.statPoints--; this.alloc[stat]++;
@@ -633,7 +635,7 @@ export class Player {
       return;
     }
     const def = opts.pierce ? 0 : this.stats.def;
-    let d = Math.max(1, Math.round((dmg - def * 0.5) * (0.9 + Math.random() * 0.2)));
+    let d = Math.max(1, Math.round((dmg - def * 0.5) * (0.9 + Math.random() * 0.2) * this.wardMult()));
     this.hp -= d;
     this.inCombatT = 6;
     this.anim.battleTarget = 1;

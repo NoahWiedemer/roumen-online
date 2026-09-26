@@ -150,6 +150,8 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
     id: 'isel', name: 'Tower of Isel', root, terrain, colliders: ctx.colliders, nav, minimap: ctx.minimap,
     portals: [portal, vault.portal], spawn: SPAWN, areaNameAt, mapLabels: MAP_LABELS, camBlockers, cameraCeiling,
     stats: `arch ${arch.stats.tris} tris, decor ${decor.stats}, outside ${outside.stats}, vault ${vault.stats} | ms ${JSON.stringify(ms)}`,
+    vault,                                            // (its portal home to Roumen appears later: vault.home)
+    onUpdate: (fn) => ctx.onUpdate(fn),               // per-frame hooks of things living in this world (Vagel's story)
     activate(eng = engine, pos = focus) {
       const w = pos ? terrain.where(pos.x, pos.z) : null;
       showZones(w || 'hall');
@@ -168,5 +170,6 @@ export async function buildIselWorld({ engine, progress = noop } = {}) {
       for (const f of ctx.updaters) f(dt, t);
     },
   };
+  vault.home.portals = world.portals;
   return world;
 }

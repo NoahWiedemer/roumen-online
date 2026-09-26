@@ -3,8 +3,9 @@
 // either hand or both, raising, spreading, grasping, sweeping, ascending, splitting). Clips that interrupt each other
 // cross-fade. Implements the monster model interface of monsters.js. In a fight she levitates (toes pointed, hands
 // floating out from the body, a slow bob, a tilt into her drift), her hands glow while she casts, a golden halo burns
-// behind her head when she is enraged, a blink squeezes her into a sliver of light and back, and when she falls she
-// dissolves into gold. (The model's skin weights were corrected so her chest no longer balloons when she raises or
+// behind her head and her eyes blaze when she is enraged, a blink squeezes her into a sliver of light and back, and
+// when she is beaten she folds over, rears up for her vow to return and vanishes in a sliver of light (an ordinary
+// death dissolves her into gold). (The model's skin weights were corrected so her chest no longer balloons when she raises or
 // spreads her arms, and her long cloak falls from the arms to the hips instead of swinging out like a board.)
 import * as THREE from 'three';
 import { Clip, CLIPS, Animator, fullPose } from '../anim.js';
@@ -106,6 +107,25 @@ CLIPS.vg_split = new Clip('vg_split', {
   duration: 2.2, base: P_VAGEL, curve: 'smooth',
   keys: [{ t: 0, ...P_VAGEL }, { t: 0.55, stop: true, ...PALMS }, { t: 0.85, ...OPEN }, { t: 1.7, stop: true, ...OPEN }, { t: 2.2, ...P_VAGEL }],
 });
+// beaten: the last blow throws her head back, then she folds over, one hand clutching her chest, the other reaching
+// for the hero (held while she speaks; the vow cross-fades out of it)
+const RECOIL = { spine: [-0.2, 0, 0], chest: [-0.25, 0, 0], head: [-0.45, 0, 0], armL: [-0.45, 0, 0.95], elbowL: [-0.3, 0, 0], armR: [-0.45, 0, -0.95], elbowR: [-0.3, 0, 0] };
+const HUNCH = {
+  spine: [0.3, 0, 0], chest: [0.2, 0, 0], neck: [0.08, 0, 0], head: [0.16, 0, 0],
+  armR: [-0.7, 0.45, 0.25], elbowR: [-1.95, 0, 0], handR: [0.3, 0, 0],
+  armL: [-1.0, -0.2, 0.2], elbowL: [-0.35, 0, 0], handL: [0.35, 0, 0.2],
+};
+CLIPS.vg_falter = new Clip('vg_falter', {
+  duration: 9, base: P_VAGEL, curve: 'smooth',
+  keys: [{ t: 0, ...P_VAGEL }, { t: 0.25, ...RECOIL }, { t: 0.95, stop: true, ...HUNCH }, { t: 4.5, ...HUNCH, head: [0.24, 0.12, 0], armL: [-1.1, -0.25, 0.2] }, { t: 8.4, stop: true, ...HUNCH }, { t: 9, ...P_VAGEL }],
+});
+// ... and her vow to return: she rears up, arms thrown to the sky, then spreads them wide and glares down at the hero
+const FURY = { armL: [-2.6, 0, 0.55], elbowL: [-0.35, 0, 0], handL: [0, 0, 0.3], armR: [-2.6, 0, -0.55], elbowR: [-0.35, 0, 0], handR: [0, 0, -0.3], spine: [-0.1, 0, 0], chest: [-0.2, 0, 0], head: [-0.4, 0, 0] };
+const DEFY = { ...WIDE, armL: [-0.55, 0, 1.25], armR: [-0.55, 0, -1.25], chest: [-0.12, 0, 0], head: [0.12, 0, 0] };
+CLIPS.vg_vow = new Clip('vg_vow', {
+  duration: 8, base: P_VAGEL, curve: 'smooth',
+  keys: [{ t: 0, ...P_VAGEL }, { t: 0.55, stop: true, ...FURY }, { t: 1.6, ...FURY, head: [-0.46, 0, 0] }, { t: 2.3, stop: true, ...DEFY }, { t: 7.4, stop: true, ...DEFY }, { t: 8, ...P_VAGEL }],
+});
 
 // motion-capture clips with the legs held in the levitating pose (casting while hovering)
 function hoverClip(name, src, speed = 1) {
@@ -147,6 +167,8 @@ const sprite = (color, size, map = tex('glow')) => {
 
 const GOLD = new THREE.Color('#ffd24a'), VIOLET = new THREE.Color('#b04aff');
 const _v = new THREE.Vector3();
+// where her eyes sit in the head frame (metres at scale 1.6: sideways, up, forwards)
+const EYE = [0.045, 0.068, 0.18];
 
 export class VagelModel {
   constructor(type) {
@@ -202,6 +224,20 @@ export class VagelModel {
     this.halo = sprite('#ffe6a0', (0.9 * this.k) / this.scale, haloTexture());
     this.halo.position.set(0, (0.2 * this.k) / this.scale, (-0.16 * this.k) / this.scale);
     if (head) head.add(this.halo);
+    // her eyes blaze in her wrath: a white-hot core and a crimson streak each, deep in the hood
+    this.eyeK = 0; this.eyeTarget = 0;
+    this.eyes = [];
+    const u = this.k / this.scale;
+    if (head) for (const s of [-1, 1]) {
+      const g = new THREE.Group();
+      g.position.set(s * EYE[0] * u, EYE[1] * u, EYE[2] * u);
+      const core = sprite('#fff0c0', 0.07 * u), glow = sprite('#ff3a5a', 0.2 * u), streak = sprite('#ff4a7a', 1);
+      streak.scale.set(0.4 * u, 0.04 * u, 1);
+      g.add(glow, streak, core);
+      head.add(g);
+      this.eyes.push({ core, glow, streak });
+    }
+    this.outT = -1;                             // vanishing (her defeat): squeezed into light, then gone
   }
 
   // ---------------------------------------------------------------- actions
@@ -230,6 +266,9 @@ export class VagelModel {
   setDrift(fwd, side) { this.leanTarget[0] = clamp(fwd * 0.07, -0.14, 0.14); this.leanTarget[1] = clamp(side * 0.07, -0.14, 0.14); }
   setCast(right, left = 0) { this.castTarget[0] = right; this.castTarget[1] = left; }
   setRage(on) { this.rageTarget = on ? 1 : 0; }
+  setEyes(on) { this.eyeTarget = on ? 1 : 0; }
+  // her defeat: squeezed into a sliver of light, then gone (monsters.js removes her once `dead`)
+  vanishOut() { if (this.outT < 0) this.outT = 0; }
   handWorld(side, out = new THREE.Vector3()) {
     const h = side === 'L' ? this.rig.weaponHolderL : this.rig.weaponHolder;
     h.updateWorldMatrix(true, false);
@@ -310,6 +349,18 @@ export class VagelModel {
     this.rage += (this.rageTarget - this.rage) * (1 - Math.exp(-2 * dt));
     this.halo.material.opacity = this.rage * (0.8 + 0.2 * Math.sin(this.t * 3));
     this.halo.material.rotation = this.t * 0.4;
+    this.eyeK += (this.eyeTarget - this.eyeK) * (1 - Math.exp(-3 * dt));
+    this.eyes.forEach((e, i) => {
+      const f = this.eyeK * (0.85 + 0.15 * Math.sin(this.t * 21 + i * 2.1));
+      e.core.material.opacity = f;
+      e.glow.material.opacity = f * 0.75;
+      e.streak.material.opacity = f * (0.55 + 0.25 * Math.sin(this.t * 7.3 + i));
+    });
+    if (this.outT >= 0) {
+      this.outT += dt;
+      this.vanish = smoothstep(0, 0.55, this.outT);
+      if (this.outT > 0.6) { this.dead = true; this.root.visible = false; }
+    }
     this.hl += (this.hlTarget - this.hl) * (1 - Math.exp(-14 * dt));
     this.flash = Math.max(0, this.flash - dt * 5);
     this.rim.setRGB(0.5 * this.hl + 1.0 * this.flash + 0.25 * this.rage, 0.42 * this.hl + 0.55 * this.flash + 0.16 * this.rage, 0.3 * this.hl + 0.3 * this.flash + 0.02 * this.rage);
@@ -339,7 +390,7 @@ export class VagelModel {
 
   dispose() {
     this.mat.dispose();
-    for (const s of [...this.handGlow, this.halo]) s.material.dispose();
+    for (const s of [...this.handGlow, this.halo, ...this.eyes.flatMap((e) => [e.core, e.glow, e.streak])]) s.material.dispose();
     this.root.parent?.remove(this.root);
   }
 }
