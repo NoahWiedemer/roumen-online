@@ -160,6 +160,11 @@ export const SPAWN_ZONES = [
   zoneAt('rat_t1a', 'ratman_digger', 120, 63, 7, 3, [6, 7]),
   zoneAt('rat_t1b', 'ratman_digger', 50, 63, 7, 3, [6, 7]),
   zoneAt('rat_t1c', 'ratman_digger', -50, 63, 7, 3, [6, 7]),
+  // Hammer Boars: slow, heavy hitters wandering the upper half of tier 1 and tier 2 (never down in the forest)
+  zoneAt('boar_t1a', 'hammer_boar', 170, 64, 7, 2, [7, 8]),
+  zoneAt('boar_t1b', 'hammer_boar', -88, 64, 7, 2, [7, 8]),
+  zoneAt('boar_t2a', 'hammer_boar', 105, 46, 6, 2, [9, 10]),
+  zoneAt('boar_t2b', 'hammer_boar', -165, 46, 6, 2, [9, 10]),
   // tier 2 (hypnotised, aggressive at short range)
   zoneAt('rat_t2a', 'ratman_hypno', -100, 46, 6, 3, [8, 9]),
   zoneAt('rat_t2b', 'ratman_hypno', -25, 46, 6, 3, [8, 10]),

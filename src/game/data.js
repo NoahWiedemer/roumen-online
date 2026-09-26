@@ -236,6 +236,13 @@ export const MONSTERS = {
     speed: 3.1, range: 1.9, atkCd: 1.8, aggressive: true, aggroRange: 5, leash: 22, respawn: 24,
     drops: [['rat_whisker', 0.65], ['hp_potion_m', 0.1], ['sp_potion_m', 0.07], ['helm_iron', 0.02], ['necklace_jade', 0.015]],
   },
+  // Hammer Boar of Cyclone Hill (skinned eber.glb + a maul, entities/monsters/hammerBoar.js): slow, long wind-up,
+  // hits hard; neutral until attacked. Tier 1 and 2 of the hill
+  hammer_boar: {
+    name: 'Hammer Boar', model: 'eber', baseLv: 8, hp: 340, atk: [36, 46], def: 12, exp: 62, copper: [45, 85],
+    speed: 2.3, range: 2.4, atkCd: 3.6, aggressive: false, leash: 24, respawn: 24,
+    drops: [['boar_tusk', 0.45], ['boar_hide', 0.35], ['hp_potion_m', 0.1], ['sp_potion_m', 0.06], ['pants_plate', 0.015], ['boots_plate', 0.015]],
+  },
   kingslime: {
     name: 'Slime King', baseLv: 9, hp: 950, atk: [26, 36], def: 11, exp: 320, copper: [700, 1200], speed: 2.2, range: 3.2, atkCd: 2.6,
     aggressive: true, aggroRange: 9, leash: 30, respawn: 150, boss: true,
@@ -390,7 +397,7 @@ export const QUESTS = {
   // Cyclone Hill: Sir Ratman sends the hero after the machine that hypnotises his people
   q_cumbot: {
     name: 'The Jolly Machine', giver: 'sir_ratman', level: 12,
-    text: 'Beyond the sky bridge, in the Windward Glade before the Tower of Isel, stands a jolly-looking machine called Cumbot 9000. Its humming clouds the minds of my people. Shut it down! Beware: it lobs slime, and whoever stands in the path of its pink cannon beam forgets how to move for a moment.',
+    text: 'Beyond the sky bridge, in the Windward Glade before the Tower of Isel, stands a jolly-looking machine called Cumbot 9000. Its humming clouds the minds of my people. Shut it down! Beware: it lobs sticky milk bombs, and whoever stands in the path of its cannon stream forgets how to move for a moment.',
     goal: { type: 'kill', target: 'cumbot', count: 1 },
     reward: { exp: 2400, copper: 6000, items: [['hp_potion_l', 5], ['sp_potion_l', 3]] },
   },

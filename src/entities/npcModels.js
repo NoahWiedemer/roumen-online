@@ -66,6 +66,26 @@ const SPECS = {
       mat.needsUpdate = true;
     },
   },
+  // the Hammer Boar monster (user's Eber.glb, white spiky fur): hunched boar-man with digitigrade legs
+  // (hip -> knee -> hock -> toe); Bone_023 / Bone_028 are the clavicles, the fingers stay unmapped
+  eber: {
+    url: BASE + 'models/eber.glb', rootBone: 'Bone_000', recenter: true, scale: 1.45, portraitY: 1.45, portraitDist: 0.95,
+    boneMap: {
+      hips: 'Bone_001', spine: 'Bone_006', chest: 'Bone_004', neck: 'Bone_003', head: 'Bone_018',
+      armL: 'Bone_022', elbowL: 'Bone_021', handL: 'Bone_020',
+      armR: 'Bone_027', elbowR: 'Bone_026', handR: 'Bone_025',
+      legL: 'Bone_016', kneeL: 'Bone_015', footL: 'Bone_014',
+      legR: 'Bone_011', kneeR: 'Bone_010', footR: 'Bone_009',
+    },
+    segmentEnd: {
+      armL: 'Bone_021', elbowL: 'Bone_020', handL: 'Bone_019', armR: 'Bone_026', elbowR: 'Bone_025', handR: 'Bone_024',
+      legL: 'Bone_015', kneeL: 'Bone_014', legR: 'Bone_010', kneeR: 'Bone_009',
+    },
+    material(mat) {
+      mat.metalnessMap = null; mat.metalness = 0; mat.roughness = 0.85;
+      mat.needsUpdate = true;
+    },
+  },
 };
 
 const templates = {};

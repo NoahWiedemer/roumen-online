@@ -254,7 +254,7 @@ export class CumbotModel extends MonsterBase {
     // glows: pink eyes and cuffs (hypno cannon), lime tank
     this.eyeGlow = [glowSprite('#ff4ad8', 1.1), glowSprite('#ff4ad8', 1.1)];
     this.sock.eyeL.add(this.eyeGlow[0]); this.sock.eyeR.add(this.eyeGlow[1]);
-    this.cuffGlow = [glowSprite('#ff5ae0', 2.4), glowSprite('#ff5ae0', 2.4)];
+    this.cuffGlow = [glowSprite('#fff6e8', 2.4), glowSprite('#fff6e8', 2.4)];   // the cannons fill with milk
     this.sock.muzzleL.add(this.cuffGlow[0]); this.sock.muzzleR.add(this.cuffGlow[1]);
     this.tankSprite = glowSprite('#9dff4a', 3.2);
     this.sock.tankTop.add(this.tankSprite);

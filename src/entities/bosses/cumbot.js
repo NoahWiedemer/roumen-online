@@ -1,7 +1,7 @@
 // Cumbot 9000 — the mid boss of Cyclone Hill. He guards the portal into the Tower of Isel and hums the tune that
 // hypnotises the rat-folk. Fight rules (all telegraphed, all dodgeable):
 //   melee        cuff hammer punches (left / right); every third attack a two-handed ground slam (red circle in front)
-//   Slime Mortar the tank on his back lobs slime blobs at the hero (green circles); hits hurt and leave sticky puddles
+//   Milk Mortar  the tank on his back lobs milk bombs at the hero (warning circles); hits hurt and leave sticky puddles
 //   Hypno Cannon both cuffs charge pink, a lane shows where the beam will go; the beam sweeps slowly after the hero.
 //                Getting caught hypnotises the hero for a moment (no moving, no attacking)
 //   Jingle Quake (below 50%) he crouches, jumps and lands: a big orange circle around him — run out or jump over it
@@ -26,7 +26,8 @@ const LINES = {
   win: 'Another voice for my choir! Ho ho ho!',
   death: 'Ho... ho... h-o... *bzzzt*',
 };
-const LIME = new THREE.Color('#9dff4a'), SPARK = new THREE.Color('#ffe08a'), SMOKE = new THREE.Color('#6a6a70'), PINK = new THREE.Color('#ff6ae8');
+// (splash particles are additive, so the milk colour is a little grey to stay creamy instead of glowing)
+const MILK = new THREE.Color('#cfccc4'), SPARK = new THREE.Color('#ffe08a'), SMOKE = new THREE.Color('#6a6a70');
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 export class CumbotBoss extends Monster {
@@ -238,7 +239,7 @@ export class CumbotBoss extends Monster {
     const p = G.player;
     const top = this.model.socketWorld('tankTop', new THREE.Vector3());
     G.audio.play('mortar');
-    G.fx.particles.burst(top.x, top.y, top.z, 18, { color: LIME, speed: 5, life: 0.6, size: 0.45, grav: -4, up: 1.2 });
+    G.fx.particles.burst(top.x, top.y, top.z, 18, { color: MILK, speed: 5, life: 0.6, size: 0.45, grav: -4, up: 1.2 });
     const targets = [[p.pos.x, p.pos.z]];
     if (i >= 1) targets[0] = [p.pos.x + this.pVel.x * 1.1, p.pos.z + this.pVel.z * 1.1];   // lead the hero
     const extra = i + (this.phase === 2 ? 1 : 0);
@@ -252,15 +253,15 @@ export class CumbotBoss extends Monster {
   }
   splat(x, z) {
     const p = G.player, y = G.terrain.groundAt(x, z);
-    G.fx.particles.burst(x, y + 0.4, z, 30, { color: LIME, speed: 7, life: 0.7, size: 0.5, grav: -10, up: 0.9 });
-    G.fx.ring(new THREE.Vector3(x, y, z), { color: '#9dff4a', from: 0.5, to: 5.5, life: 0.45 });
+    G.fx.particles.burst(x, y + 0.4, z, 30, { color: MILK, speed: 7, life: 0.7, size: 0.5, grav: -10, up: 0.9 });
+    G.fx.ring(new THREE.Vector3(x, y, z), { color: '#bdbab2', from: 0.5, to: 5.5, life: 0.45 });
     G.audio.play('splat');
     this.shake(0.25, x, z);
     this.hz.puddle(x, z, 2.3, 7.5);
     if (!p.dead && Math.hypot(p.pos.x - x, p.pos.z - z) < 2.6 + p.radius) {
       this.hurt(1.25, { sure: true });
       p.addBuff('slowed', 3.5, {});
-      G.fx.text(p.headPos(), 'Slimed!', 'miss');
+      G.fx.text(p.headPos(), 'Splashed!', 'miss');
     }
   }
   beamUpdate(a, dt, toP) {
@@ -288,7 +289,7 @@ export class CumbotBoss extends Monster {
       if (Math.random() < dt * 40) {
         const s = 4.6 + Math.random() * 24;
         const x = this.pos.x + dx * s, z = this.pos.z + dz * s;
-        G.fx.particles.emit({ x, y: G.terrain.groundAt(x, z) + 1.1, z, vx: (Math.random() - 0.5) * 3, vy: 1.5 + Math.random() * 2, vz: (Math.random() - 0.5) * 3, life: 0.6, size: 0.4, color: PINK, grav: 0, drag: 1.5 });
+        G.fx.particles.emit({ x, y: G.terrain.groundAt(x, z) + 1.1, z, vx: (Math.random() - 0.5) * 3, vy: 1.5 + Math.random() * 2, vz: (Math.random() - 0.5) * 3, life: 0.6, size: 0.4, color: MILK, grav: -6, drag: 1.5 });
       }
       if (!a.hitDone && !p.dead && Hazards.inLane(a.lane, p.pos.x, p.pos.z, p.radius) && p.jumpY < 1.4) {
         a.hitDone = true;

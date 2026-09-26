@@ -732,13 +732,12 @@ export class Player {
         const rx = -f.z, rz = f.x; // right vector
         let dx = f.x * iz + rx * ix, dz = f.z * iz + rz * ix;
         const l = Math.hypot(dx, dz); dx /= l; dz /= l;
-        const back = iz < 0 && ix === 0;
-        speed = maxSpeed * (back ? 0.6 : 1) * slowed;
+        // every direction is run facing forwards (S turns the hero around instead of backpedalling)
+        speed = maxSpeed * slowed;
         this.tryMove(dx * speed * dt, dz * speed * dt);
-        this.faceGoal = back ? Math.atan2(-dx, -dz) : Math.atan2(dx, dz);
-        this.anim.moveDir = back ? -1 : 1;
+        this.faceGoal = Math.atan2(dx, dz);
         moving = true;
-      } else this.anim.moveDir = 1;
+      }
 
       // --- pending interactions / auto attack
       if (!moving) {

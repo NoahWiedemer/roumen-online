@@ -3,7 +3,7 @@
 // and `root` ([x,y,z] body offset, used for leaps). Missing joints fall back to the previous key.
 import * as THREE from 'three';
 import { JOINTS } from './humanoid.js';
-import { clamp, lerp } from '../core/utils.js';
+import { clamp, lerp, smoothstep } from '../core/utils.js';
 
 const ease = {
   linear: (t) => t,
@@ -199,6 +199,7 @@ fullPose(P_IDLE); fullPose(P_BATTLE); fullPose(P_SIT); fullPose(P_RIDE); fullPos
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qc = new THREE.Quaternion();
 const _eu = new THREE.Euler(0, 0, 0, 'YXZ');
 const _aimOut = { L: null, R: null };
+const _stance = [0, 0, 0];
 function eulerQ(r, out) { return out.setFromEuler(_eu.set(r[0], r[1], r[2], 'YXZ')); }
 function chainQ(p, side) {
   const q = new THREE.Quaternion();
@@ -576,7 +577,7 @@ export class Animator {
   // speed (planted feet do not slide). Weapon holding arms are layered on top of the mocap body.
   useMocap(lib) {
     this.mocap = lib;
-    this.mc = { idleT: Math.random() * 2, phase: 0, airT: 0 };
+    this.mc = { idleT: Math.random() * 2, phase: 0, airT: 0, w: 0, stop: null };
     this.mcA = emptyPose(); this.mcB = emptyPose(); this.mcW = emptyPose();
   }
   armStyle() {
@@ -603,12 +604,30 @@ export class Animator {
     const k = clamp((gv - natW * 1.15) / (natR * 0.7 - natW * 1.15), 0, 1);
     const rateW = clamp(gv / natW, 0.6, 1.9), rateR = clamp(gv / natR, 0.7, 1.6);
     const f = lerp(rateW / walk.duration, rateR / run.duration, k);   // gait cycles per second
-    if (v > 0.05 && s > 0.01) this.mc.phase += dt * f * (this.moveDir < 0 ? -0.8 : 1);
-    const ph = ((this.mc.phase % 1) + 1) % 1;
+    const mc = this.mc;
+    let w = Math.min(1, s * 3.4);
+    if (v > 0.05 && s > 0.01) {
+      mc.phase += dt * f * (this.moveDir < 0 ? -0.8 : 1);
+      mc.stop = null;
+      mc.w = w;
+    } else if (mc.w > 0.02) {
+      // stopping: instead of freezing mid-stride, the step runs on to the next passing position (phase .25 / .75:
+      // one foot planted under the body, the other beside it) while the gait blends into the stand
+      if (!mc.stop) {
+        const p0 = mc.phase, target = 0.25 + 0.5 * Math.ceil((p0 - 0.25 + 0.03) / 0.5);
+        mc.stop = { t: 0, p0, dist: target - p0, dur: clamp((target - p0) / Math.max(f, 0.8), 0.16, 0.34), w0: mc.w };
+      }
+      const st = mc.stop;
+      st.t = Math.min(st.dur, st.t + dt);
+      const x = st.t / st.dur;
+      mc.phase = st.p0 + st.dist * (1 - (1 - x) * (1 - x));        // eases into the planted position
+      w = st.w0 * (1 - smoothstep(0.3, 1, x));
+      if (x >= 1) mc.w = 0;
+    } else { mc.stop = null; w = 0; }
+    const ph = ((mc.phase % 1) + 1) % 1;
     walk.sample(((ph + mw.contact) % 1) * walk.duration, A);
     run.sample(((ph + mr.contact) % 1) * run.duration, B);
     blendPose(A, B, k, W);
-    const w = Math.min(1, s * 3.4);
     blendPose(J, W, w, J);
     // lean into turns
     const ln = this.lean * s;
@@ -645,6 +664,15 @@ export class Animator {
           const k = aimed ? 1 : rw;
           if (!idleC && !runC) continue;
           const o = J[ch];
+          if (aimed && idleC && w > 0.001) {
+            // aimed hand: rotate between the stance grip and the aimed grip on the shortest path (lerping the
+            // Euler angles would swing the blade through odd orientations while starting / stopping)
+            for (let i = 0; i < 3; i++) _stance[i] = lerp(idleC[i], this.battlePose[ch][i], this.battle);
+            eulerQ(_stance, _qa).slerp(eulerQ(runC, _qb), w);
+            _eu.setFromQuaternion(_qa, 'YXZ');
+            o[0] = _eu.x; o[1] = _eu.y; o[2] = _eu.z;
+            continue;
+          }
           for (let i = 0; i < 3; i++) {
             const m = o[i];
             const a = idleC ? lerp(idleC[i], this.battlePose[ch][i], this.battle) : m;

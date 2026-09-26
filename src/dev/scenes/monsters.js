@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { createMonsterModel, MONSTER_TYPES, warmupMonsters, preloadMonsterAssets } from '../../entities/monsterModels.js';
 import { makeCanvas, toTexture } from '../../core/textures.js';
+import { preloadNpcModels } from '../../entities/npcModels.js';
 
 function label(text, sub) {
   const c = makeCanvas(512, 128);
@@ -60,6 +61,7 @@ export default async function (ctx) {
   window.addEventListener('unhandledrejection', (e) => report(e.reason));
   try {
     await preloadMonsterAssets();
+    await preloadNpcModels(['ratman_mob', 'eber']);                 // skinned monsters (rat-men, Hammer Boar)
     const only = q.get('only');
     const types = only ? only.split(',') : MONSTER_TYPES;
     const state = q.get('state') || 'idle';
@@ -109,6 +111,7 @@ export default async function (ctx) {
       });
     }
 
+    window.__mons = entries;   // debug handle (live pose tuning from the console)
     const lines = entries.slice(0, 6).map(({ type, m }) => {
       const s = stats(m);
       return `${type.padEnd(10)} tris ${String(s.tris).padStart(6)}  meshes ${String(s.meshes).padStart(2)}  mats ${s.mats}  h ${m.height}  r ${m.radius}  headY ${m.headY.toFixed(2)}  impact ${m.impactTime}s`;

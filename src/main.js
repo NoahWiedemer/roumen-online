@@ -100,7 +100,7 @@ async function init() {
   // other worlds are built on their first visit (see world/worlds.js)
   registerBuilder('cyclone', async (progress) => {
     await progress(2, 'Summoning the locals…');
-    try { await preloadNpcModels(['ratman', 'robo', 'ratman_mob']); } catch (e) { console.warn('NPC models', e); }
+    try { await preloadNpcModels(['ratman', 'robo', 'ratman_mob', 'eber']); } catch (e) { console.warn('NPC models', e); }
     try { const { preloadCumbot } = await import('./entities/bosses/cumbot.js'); await preloadCumbot(); } catch (e) { console.warn('Cumbot 9000', e); }
     const { buildCycloneWorld } = await import('./world/cyclone/index.js');
     const { SPAWN_ZONES: CYCLONE_SPAWNS } = await import('./world/cyclone/layout.js');

@@ -1,11 +1,13 @@
 // Boss fight effects that matter for gameplay: ground telegraphs (circles and lanes that fill up until they go
-// off), lobbed slime blobs with sticky puddles, and the hypno beam. Decals are grids whose vertices follow the
+// off), lobbed milk bombs with sticky puddles, and the hypno cannon's milk stream. Decals are grids whose vertices follow the
 // terrain, so they read correctly on uneven ground. Everything lives in one group under the world root.
 import * as THREE from 'three';
 import { G } from '../../game/game.js';
 import { tex } from '../../core/textures.js';
+import { envTexture } from '../monsters/common.js';
 
 const _g = new THREE.Vector3();
+const MILK = new THREE.Color('#f7f5ee');
 const TELE_VS = `
   attribute vec2 aLocal; varying vec2 vL;
   void main(){ vL = aLocal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
@@ -36,8 +38,10 @@ const TELE_FS = `
       float wob = 0.9 + 0.06 * sin(atan(vL.y, vL.x) * 5.0 + uTime * 1.3) + 0.04 * sin(atan(vL.y, vL.x) * 9.0 - uTime);
       if (r > wob) discard;
       float bub = smoothstep(0.75, 1.0, sin(vL.x * 17.0 + uTime * 2.0) * sin(vL.y * 15.0 - uTime * 1.7));
-      a = 0.62 + 0.25 * smoothstep(wob - 0.12, wob, r) + bub * 0.25;
-      col = uColor * (0.75 + 0.5 * bub + 0.4 * smoothstep(wob - 0.1, wob, r));
+      // creamy and nearly opaque: a thin darker rim, a soft sheen towards the middle
+      float rim = smoothstep(wob - 0.1, wob, r);
+      a = 0.93 - rim * 0.25;
+      col = uColor * (0.96 + 0.08 * bub - 0.2 * rim + 0.08 * smoothstep(0.6, 0.0, length(vL - vec2(-0.25, -0.2))));
     }
     gl_FragColor = vec4(col, a * uAlpha);
     #include <tonemapping_fragment>
@@ -97,17 +101,22 @@ class Decal {
   dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mat.dispose(); }
 }
 
-// ------------------------------------------------------------------ beam (hypno cannon)
-const BEAM_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
+// ------------------------------------------------------------------ beam (hypno cannon): a gushing stream of milk
+const BEAM_VS = `varying vec2 vUv; varying float vUp;
+  void main(){ vUv = uv; vUp = normalize((modelMatrix * vec4(normal, 0.0)).xyz).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
 const BEAM_FS = `
-  uniform float uTime, uAlpha, uLen; uniform vec3 uA, uB; varying vec2 vUv;
+  uniform float uTime, uAlpha, uLen; uniform vec3 uA, uB; varying vec2 vUv; varying float vUp;
   void main(){
     float along = vUv.y * uLen;                        // metres from the muzzle
-    float sp = sin(vUv.x * 6.2832 * 3.0 + along * 1.6 - uTime * 16.0);
-    float band = smoothstep(0.2, 1.0, sp);
-    float fadeEnd = smoothstep(uLen, uLen - 6.0, along) * smoothstep(0.0, 0.8, along);
-    vec3 col = mix(uA, uB, band);
-    gl_FragColor = vec4(col * (0.55 + band * 0.8), (0.3 + band * 0.5) * fadeEnd * uAlpha);
+    float around = vUv.x * 6.2832;
+    // ripples rushing down the stream, lit from above with wet glints on top (a creamy, liquid look)
+    float rip = 0.5 + 0.5 * sin(along * 2.6 - uTime * 22.0 + sin(around * 2.0 + along * 0.4) * 1.6);
+    float rip2 = 0.5 + 0.5 * sin(along * 5.3 - uTime * 31.0 + around * 1.0);
+    float light = clamp(vUp * 0.5 + 0.5, 0.0, 1.0);
+    float shade = 0.62 + 0.38 * light + 0.35 * pow(light, 12.0) * rip2;     // body shading + wet glints
+    float fadeEnd = smoothstep(uLen, uLen - 5.0, along) * smoothstep(0.0, 0.5, along);
+    vec3 col = mix(uB, uA, rip) * shade;
+    gl_FragColor = vec4(col, (0.86 + rip * 0.14) * fadeEnd * uAlpha);
     #include <colorspace_fragment>
   }`;
 function beamMesh(radius, len, a, b, alpha) {
@@ -115,7 +124,7 @@ function beamMesh(radius, len, a, b, alpha) {
   g.rotateX(Math.PI / 2);
   g.translate(0, 0, len / 2);
   const m = new THREE.ShaderMaterial({
-    vertexShader: BEAM_VS, fragmentShader: BEAM_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: BEAM_VS, fragmentShader: BEAM_FS, transparent: true, depthWrite: false,
     uniforms: { uTime: { value: 0 }, uAlpha: { value: alpha }, uLen: { value: len }, uA: { value: new THREE.Color(a) }, uB: { value: new THREE.Color(b) } },
   });
   const mesh = new THREE.Mesh(g, m);
@@ -133,7 +142,8 @@ export class Hazards {
     this.items = [];
     this.t = 0;
     this.blobGeo = new THREE.SphereGeometry(0.6, 16, 12);
-    this.blobMat = new THREE.MeshStandardMaterial({ color: '#9dff4a', emissive: '#4aa010', emissiveIntensity: 0.9, roughness: 0.2, metalness: 0, transparent: true, opacity: 0.92 });
+    // milk bombs: creamy white and glossy
+    this.blobMat = new THREE.MeshStandardMaterial({ color: '#fbf9f3', emissive: '#4a4842', emissiveIntensity: 0.5, roughness: 0.12, metalness: 0, envMap: envTexture(), envMapIntensity: 0.9 });
   }
 
   // a filling circle that goes off after `dur` (onDone(x, z, r) called then)
@@ -164,9 +174,9 @@ export class Hazards {
     const h = 7 + from.distanceTo(to) * 0.35;
     this.items.push({ kind: 'blob', m, from: from.clone(), to, t: 0, dur: flight, h, onLand });
   }
-  // sticky slime puddle: slows whoever stands in it
+  // sticky milk puddle: slows whoever stands in it
   puddle(x, z, r, life) {
-    const d = new Decal(this.group, '#7fdc2a', 2, 20, 20);
+    const d = new Decal(this.group, '#f2efe6', 2, 20, 20);
     d.placeCircle(x, z, r);
     const it = { kind: 'puddle', d, x, z, r, t: 0, dur: life };
     this.items.push(it);
@@ -177,10 +187,11 @@ export class Hazards {
   beam(len) {
     const g = new THREE.Group();
     const slant = new THREE.Group(), run = new THREE.Group();
-    const sCore = beamMesh(0.2, 1, '#ffe0fa', '#ff9ae8', 0.9), sOuter = beamMesh(0.6, 1, '#ff2ad0', '#8a2aff', 0.55);
-    const rCore = beamMesh(0.22, len, '#ffe0fa', '#ff9ae8', 0.9), rOuter = beamMesh(0.7, len, '#ff2ad0', '#8a2aff', 0.55);
+    // a dense milky core inside a thinner, splashy sheath
+    const sCore = beamMesh(0.26, 1, '#ffffff', '#d6cfbf', 0.95), sOuter = beamMesh(0.4, 1, '#fbf9f2', '#d9d4c6', 0.4);
+    const rCore = beamMesh(0.3, len, '#ffffff', '#d6cfbf', 0.95), rOuter = beamMesh(0.46, len, '#fbf9f2', '#d9d4c6', 0.4);
     slant.add(sCore, sOuter); run.add(rCore, rOuter);
-    const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: new THREE.Color('#ff6ae8'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex('glow'), color: new THREE.Color('#fffaf0'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 }));
     const splash = new THREE.Sprite(flare.material.clone());
     g.add(slant, run, flare, splash);
     this.group.add(g);
@@ -194,7 +205,7 @@ export class Hazards {
       sCore.material.uniforms.uLen.value = sOuter.material.uniforms.uLen.value = L;
       run.position.set(gx, gy, gz);
       run.rotation.set(0, Math.atan2(dx, dz), 0);
-      for (const m of mats) { if (m.uniforms) m.uniforms.uAlpha.value = (m === sOuter.material || m === rOuter.material ? 0.55 : 0.9) * alpha; else m.opacity = alpha; }
+      for (const m of mats) { if (m.uniforms) m.uniforms.uAlpha.value = (m === sOuter.material || m === rOuter.material ? 0.22 : 1) * alpha; else m.opacity = alpha * 0.6; }
       flare.position.copy(muzzle); flare.scale.setScalar(3.5 + Math.sin(this.t * 40) * 0.6);
       splash.position.set(gx, gy, gz); splash.scale.setScalar(4 + Math.sin(this.t * 33) * 0.8);
     };
@@ -233,11 +244,11 @@ export class Hazards {
         it.m.position.y += it.h * 4 * k * (1 - k);
         const s = 1 + 0.18 * Math.sin(it.t * 18);
         it.m.scale.set(s, 2 - s, s);
-        if (Math.random() < dt * 30) G.fx.particles.emit({ x: it.m.position.x, y: it.m.position.y, z: it.m.position.z, vy: -0.5, life: 0.6, size: 0.35, color: new THREE.Color('#9dff4a'), grav: -3, alpha: 0.7 });
+        if (Math.random() < dt * 30) G.fx.particles.emit({ x: it.m.position.x, y: it.m.position.y, z: it.m.position.z, vy: -0.5, life: 0.6, size: 0.35, color: MILK, grav: -3, alpha: 0.5 });
         if (k >= 1) { it.dead = true; it.onLand && it.onLand(it.to.x, it.to.z); }
       } else if (it.kind === 'puddle') {
         const fadeIn = Math.min(1, it.t / 0.25), fadeOut = Math.min(1, (it.dur - it.t) / 1.2);
-        it.d.mat.uniforms.uAlpha.value = Math.max(0, Math.min(fadeIn, fadeOut)) * 0.85;
+        it.d.mat.uniforms.uAlpha.value = Math.max(0, Math.min(fadeIn, fadeOut));
         it.d.mat.uniforms.uTime.value = this.t;
         // sticky: slows the hero while inside
         if (p && !p.dead && Math.hypot(p.pos.x - it.x, p.pos.z - it.z) < it.r * 0.9 && it.t < it.dur - 0.8) {
